@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>星枢 · 天文AI助手</title>
+<style>
+  :root{--bg:#070c18;--surface:rgba(18,26,46,.72);--stroke:rgba(90,120,180,.18);--text:#eef2fb;--t3:#8493b8;
+    --accent:#22d3ee;--accent2:#818cf8;--ok:#34d399;--warn:#fbbf24;--danger:#fb7185;--ok:#0c8f6f;--warn:#e8a33d;--err:#e05252}
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI','Microsoft YaHei UI',sans-serif}
+  body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;background:radial-gradient(1200px 800px at 80% -10%,rgba(129,140,248,.07),transparent 60%),radial-gradient(900px 600px at -10% 110%,rgba(34,211,238,.06),transparent 55%),var(--bg);background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column}
+  .top{backdrop-filter:blur(14px);background:rgba(10,16,32,.6);border-bottom:1px solid rgba(90,120,180,.15);padding:13px 22px;background:linear-gradient(135deg,#0b1220,#132039);
+    border-bottom:1px solid var(--stroke);display:flex;align-items:center;gap:12px}
+  .logo{font-size:17px;font-weight:700;background:linear-gradient(90deg,#22d3ee,#7c6cf0);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .sub{font-size:11px;color:var(--t3)}
+  .dot{width:8px;height:8px;border-radius:50%;background:#444;margin-left:auto}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .dot.off{background:var(--err)}
+  
+  /* 聊天区 */
+  
+  #msgs{flex:1;overflow-y:auto;padding:22px 26px}
+  .m{max-width:78%;margin-bottom:14px;animation:in .2s ease}
+  .m.user{margin-left:auto}
+  .bub{padding:11px 15px;border-radius:13px;line-height:1.7;font-size:13.5px;white-space:pre-wrap}
+  .m.user .bub{background:linear-gradient(135deg,#22d3ee,#0ea5b7);color:#fff;border-radius:14px 14px 3px 14px;box-shadow:0 2px 12px rgba(34,211,238,.2)}
+  .m.ai .bub{background:rgba(30,41,66,.6);border:1px solid var(--stroke);backdrop-filter:blur(8px);border-radius:14px 14px 14px 3px}
+  .meta{font-size:10px;color:var(--t3);margin-top:4px}
+  .tool{font-size:11px;color:var(--accent);padding:3px 0}
+  @keyframes in{from{opacity:0;transform:translateY(6px)}}
+  .inputbar{padding:14px 22px;border-top:1px solid var(--stroke);
+    background:var(--surface);display:flex;gap:10px}
+  .inputbar textarea{flex:1;background:var(--bg);border:1px solid var(--stroke);
+    border-radius:11px;color:var(--text);padding:11px 14px;font-size:13.5px;resize:none;
+    height:46px;outline:none}
+  .inputbar textarea:focus{border-color:var(--accent)}
+  .send{padding:0 22px;border:none;border-radius:11px;background:var(--accent);
+    color:#fff;font-size:14px;cursor:pointer;font-weight:600}
+  .send:disabled{opacity:.4}
+  /* 侧栏 */
+  
+  .card{backdrop-filter:blur(12px);border:1px solid var(--stroke);box-shadow:0 4px 24px rgba(0,0,0,.25);background:var(--surface);border:1px solid var(--stroke);border-radius:13px;
+    padding:13px 15px;margin-bottom:12px}
+  .card h4{font-size:11px;color:var(--t3);letter-spacing:1px;margin-bottom:9px}
+  .kv{display:flex;justify-content:space-between;font-size:12px;padding:3.5px 0}
+  .kv b{font-weight:600;color:var(--text)}
+  .kv span{color:var(--t3)}
+  .ok-t{color:var(--ok)} .warn-t{color:var(--warn)}
+  .mon{font-size:11.5px;line-height:1.9;color:var(--text)}
+  .mon b{color:var(--accent);font-weight:600}
+  .mon .dim{color:var(--t3)}
+  .pbar{height:6px;background:var(--bg);border-radius:4px;overflow:hidden;margin:4px 0}
+  .pbar>div{height:100%;background:linear-gradient(90deg,#0ea5b7,#22d3ee);border-radius:4px;transition:width .6s}
+  .mongrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .kv{display:flex;justify-content:space-between;font-size:11px;line-height:1.85}
+  .kv .dim{color:var(--t3)}
+  .kv b{font-family:Consolas,monospace}
+  .moncard{padding:9px 11px}
+  .moncard-key{padding:9px 11px}
+  .mongrid .card h4{font-size:11px;margin-bottom:6px;letter-spacing:.5px;
+    color:var(--t3);text-transform:uppercase;display:flex;align-items:center;gap:5px}
+  .mongrid .card h4::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--stroke),transparent)}
+  .events{font-size:11px;color:var(--t3);max-height:150px;overflow-y:auto;line-height:1.8}
+  .tpcat{background:none;border:1px solid var(--stroke);color:var(--t3);border-radius:9px;
+    padding:6px 13px;font-size:12px;cursor:pointer;margin-bottom:6px}
+  .tpcat:hover{border-color:var(--accent);color:var(--accent)}
+  .tpcat.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .tcard{background:var(--bg);border:1px solid var(--stroke);border-radius:13px;padding:13px 15px;
+    cursor:pointer;transition:all .15s}
+  .tcard:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 18px rgba(14,165,183,.15)}
+  .tcat{margin-bottom:8px}
+  .tcat summary{font-size:11.5px;color:var(--t3);cursor:pointer;padding:3px 0;user-select:none}
+  .tcat summary:hover{color:var(--accent)}
+  .tcat summary .n{color:var(--accent);font-size:10px}
+  .titem{font-size:11px;padding:4px 0 4px 8px;border-left:2px solid var(--stroke);
+         margin:2px 0 2px 4px;cursor:pointer;line-height:1.4}
+  .titem:hover{border-color:var(--accent);color:var(--accent)}
+  .risk{font-size:9px;padding:0 4px;border-radius:6px;margin-left:4px}
+  .risk-高{background:rgba(224,82,82,.15);color:#e05252}
+  .risk-中{background:rgba(232,163,61,.15);color:#e8a33d}
+  .risk-低{background:rgba(12,143,111,.12);color:#0c8f6f}
+  .risk-无{background:rgba(139,152,184,.12);color:#8b98b8}
+  .sug{display:flex;flex-wrap:wrap;gap:7px;padding-top:8px}
+  .sug button{background:none;border:1px solid var(--stroke);color:var(--accent);
+    border-radius:9px;padding:6px 11px;font-size:11.5px;cursor:pointer}
+  .sug button:hover{border-color:var(--accent)}
+  body.redmode{filter:sepia(1) hue-rotate(-50deg) saturate(3) brightness(.75)}
+  .rdot{animation:pulse 2s infinite}
+  @keyframes pulse{50%{opacity:.5}}
+  /* ═══ 手机/平板适配 ═══ */
+  @media (max-width: 900px){
+    .main{flex-direction:column}          /* 上下布局 */
+    .side{width:100%;max-height:38vh;order:2;overflow-y:auto}
+    .chat{order:1;flex:1}
+    .top{flex-wrap:wrap;gap:6px;padding:8px 12px}
+    .top .logo{font-size:15px}
+    #toolsBtn,#setBtn,#redBtn{padding:4px 9px;font-size:11px}
+    .sug button{font-size:11px;padding:4px 9px}
+    .inbar{padding:8px 10px}
+    #inp{font-size:15px}                  /* iOS防缩放 */
+  }
+  @media (max-width: 900px){
+    .mongrid{grid-template-columns:1fr}
+    #toolsPanel{padding:2vh 3vw}
+    #tpList{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+    .tcard{padding:10px 12px}
+  }
+
+  /* ═══ 精修: 滚动条/输入/按钮 ═══ */
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(100,130,190,.25);border-radius:6px}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(100,130,190,.45)}
+  #input,#inp,textarea{
+    background:rgba(15,23,42,.7)!important;border:1px solid rgba(90,120,180,.25)!important;
+    border-radius:14px!important;transition:border-color .2s,box-shadow .2s}
+  #input:focus,#inp:focus,textarea:focus{
+    border-color:var(--accent)!important;box-shadow:0 0 0 3px rgba(34,211,238,.12)}
+  button{transition:all .18s}
+  .sug button:hover{transform:translateY(-1px)}
+  .top .logo{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700}
+
+  /* ═══ 监控大屏 ═══ */
+  .dash{background:rgba(8,13,26,.6);border:1px solid rgba(70,100,160,.16);
+    border-radius:14px;overflow:hidden;margin-bottom:10px;
+    box-shadow:0 8px 32px rgba(0,0,0,.35),inset 0 1px 0 rgba(140,170,255,.06)}
+  .dash-head{display:flex;justify-content:space-between;align-items:center;
+    padding:8px 14px;background:linear-gradient(90deg,rgba(34,211,238,.09),transparent 70%);
+    border-bottom:1px solid rgba(70,100,160,.14)}
+  .dash-title{font-size:12px;font-weight:700;letter-spacing:4px;color:var(--accent)}
+  .live{font-size:9px;letter-spacing:2px;color:var(--ok);display:flex;align-items:center;gap:5px;font-weight:600}
+  .live i{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulse 2s infinite}
+  .dsec{padding:9px 14px 10px}
+  .dsec-h{font-size:10px;color:var(--t3);letter-spacing:2.5px;margin-bottom:4px;font-weight:600}
+  .dsec-h::before{content:"";display:inline-block;width:3px;height:9px;background:var(--accent);
+    margin-right:6px;border-radius:1.5px;vertical-align:-1px;opacity:.85}
+  .drow2{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));border-top:1px solid rgba(70,100,160,.1)}
+  @media (max-width:1100px){.drow2{grid-template-columns:1fr 1fr}}
+  @media (max-width:480px){.drow2{grid-template-columns:1fr}}
+  .drow2 .dsec:first-child{border-right:1px solid rgba(70,100,160,.1)}
+  .drow2 .dsec{padding:8px 12px}
+  .dimg{position:relative;background:#02040a;border:1px solid rgba(70,100,160,.14);
+    border-radius:8px;height:104px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .dimg span{color:var(--t3);font-size:10px;letter-spacing:2px;opacity:.6}
+  .mon{font-size:11px;line-height:2;color:var(--text)}
+  .mon b{color:var(--accent);font-weight:600;font-family:Consolas,"Courier New",monospace}
+  .mon .dim{color:var(--t3)}
+  .kv{display:flex;justify-content:space-between;font-size:11px;line-height:2.05;align-items:baseline}
+  .kv .dim{color:var(--t3);letter-spacing:1px}
+  .kv b{font-family:Consolas,monospace;color:var(--text);font-weight:600}
+  .dot-on{color:var(--ok)} .dot-off{color:var(--t3);opacity:.55} .dot-warn{color:var(--warn)} .dot-danger{color:var(--danger)}
+  .pbar{height:7px;background:rgba(10,16,32,.9);border:1px solid rgba(70,100,160,.15);border-radius:5px;overflow:hidden;margin:5px 0 3px}
+  .pbar>div{height:100%;background:linear-gradient(90deg,#0891b2,var(--accent));border-radius:5px;
+    box-shadow:0 0 10px rgba(34,211,238,.5);transition:width .8s}
+
+  /* ═══ 三栏驾驶舱布局 ═══ */
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .logo{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;font-size:17px;font-weight:800;letter-spacing:1px}
+  .brand .sub{font-size:11px;color:var(--t3);letter-spacing:3px;border-left:1px solid var(--stroke);padding-left:10px}
+  .top-mid{display:flex;gap:26px;margin-left:36px;align-items:center}
+  .titem{display:flex;flex-direction:column;gap:1px}
+  .titem .dim{font-size:9px;letter-spacing:2px}
+  .titem b{font-size:13px;font-family:Consolas,monospace;font-weight:600}
+  .main{flex:1;display:grid;grid-template-columns:3fr 6fr 3fr;gap:10px;padding:10px;overflow:hidden;min-height:0}
+  .col{display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0}
+  .col-m .bigimg{flex:2.6;background:linear-gradient(160deg,#030814,#01040c);border:1px solid rgba(70,100,160,.18);
+    border-radius:14px;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:200px;
+    box-shadow:0 10px 40px rgba(0,0,0,.5),inset 0 0 80px rgba(20,40,90,.15)}
+  .bigimg img{max-width:100%;max-height:100%;object-fit:contain}
+  .bigimg span{color:var(--t3);font-size:11px;letter-spacing:2px;opacity:.6}
+  .chart-row{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:110px}
+  .chartbox{background:rgba(8,13,26,.6);border:1px solid rgba(70,100,160,.16);border-radius:12px;
+    padding:10px 14px;display:flex;flex-direction:column;position:relative;min-height:0}
+  .chartbox svg{flex:1;min-height:0}
+  .chart-tip{position:absolute;bottom:8px;left:14px;font-size:9.5px;color:var(--t3);letter-spacing:1px;opacity:.75}
+  .chatbox{flex:1.4;display:flex;flex-direction:column;background:rgba(8,13,26,.6);
+    border:1px solid rgba(70,100,160,.16);border-radius:14px;padding:10px 12px;min-height:150px;overflow:hidden}
+  #msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:4px 2px}
+  .m{max-width:92%;font-size:12px;line-height:1.65}
+  .m.ai{align-self:flex-start}
+  .m.user{align-self:flex-end}
+  .m .bub{background:rgba(30,41,66,.55);border:1px solid var(--stroke);padding:8px 12px;border-radius:11px 11px 11px 3px}
+  .m.user .bub{background:linear-gradient(135deg,#0e7490,#0891b2);border:none;border-radius:11px 11px 3px 11px;color:#fff}
+  .m .meta{font-size:9px;color:var(--t3);margin-top:3px;opacity:.7}
+  .inputbar{display:flex;gap:8px;padding-top:8px}
+  .inputbar textarea{flex:1;background:rgba(15,23,42,.7);border:1px solid rgba(90,120,180,.25);border-radius:10px;
+    color:var(--text);padding:9px 12px;font-size:12px;resize:none;height:38px;font-family:inherit}
+  .inputbar textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px rgba(34,211,238,.1)}
+  .send{background:linear-gradient(135deg,var(--accent),#0891b2);color:#fff;border:none;border-radius:10px;
+    padding:0 18px;font-size:12px;font-weight:600;letter-spacing:2px;cursor:pointer;box-shadow:0 3px 12px rgba(34,211,238,.3)}
+  .quickbar{display:flex;gap:8px;align-items:center;padding:9px 14px;border-top:1px solid rgba(70,100,160,.14);
+    background:rgba(8,13,26,.7);overflow-x:auto}
+  .quickbar button{background:none;border:1px solid var(--stroke);color:var(--text);border-radius:9px;
+    padding:6px 13px;font-size:11.5px;cursor:pointer;white-space:nowrap}
+  .quickbar button:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
+  .events{font-size:10.5px;color:var(--t3);overflow-y:auto;flex:1;line-height:1.9}
+  /* 手机/窄窗回退: 单列 */
+  @media (max-width:1000px){
+    .main{grid-template-columns:1fr;overflow-y:auto}
+    .col{min-height:auto}
+    .top-mid{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="brand"><span class="logo">星枢</span><span class="sub">监控台</span><span class="live"><i></i>LIVE</span></div>
+  <div class="top-mid">
+    <span class="titem"><span class="dim">系统时间</span><b id="topTime">--:--:--</b></span>
+    <span class="titem"><span class="dim">观测任务</span><b id="topTarget">-</b></span>
+    <span class="titem"><span class="dim">序列</span><b id="topSeq" class="dot-off">● IDLE</b></span>
+    <span class="titem"><span class="dim">天气</span><b id="topWx" class="dot-off">● —</b></span>
+    <span class="titem"><span class="dim">停泊</span><b id="topPark" class="dot-off">● —</b></span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+  <button id="redBtn" onclick="toggleRed()" title="天文红光模式(保护暗适应)"
+    style="padding:5px 12px;border:1px solid rgba(251,113,133,.25);background:rgba(251,113,133,.08);
+    color:#fda4af;border-radius:9px;font-size:12px;cursor:pointer">◐ 红光</button>
+  <button id="setBtn" style="padding:5px 14px;border:1px solid var(--stroke);
+    background:var(--surface);color:var(--text);border-radius:9px;font-size:12px;cursor:pointer">⚙️ 设置</button>
+  <button id="toolsBtn" style="padding:5px 14px;border:1px solid var(--stroke);
+    background:var(--surface);color:var(--accent);border-radius:9px;font-size:12px;cursor:pointer">🧰 工具箱</button>
+  <span class="dot on" id="connDot" title="NINA连接"></span>
+  </div>
+</div>
+<div id="toolsPanel" style="display:none;position:fixed;inset:0;z-index:120;
+  background:rgba(5,10,20,.85);backdrop-filter:blur(4px);padding:5vh 8vw">
+  <div style="background:var(--surface);border:1px solid var(--stroke);border-radius:18px;
+    height:90vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--stroke)">
+      <b style="font-size:15px">🧰 工具箱</b>
+      <span id="tpTotal" style="font-size:11px;color:var(--t3)"></span>
+      <input id="tpSearch" placeholder="🔍 搜索工具…(名称/功能)" style="flex:1;max-width:420px;
+        background:var(--bg);border:1px solid var(--stroke);border-radius:10px;color:var(--text);
+        padding:8px 14px;font-size:13px;outline:none"/>
+      <button onclick="toggleTools(false)" style="background:none;border:none;color:var(--t3);
+        font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div id="tpCats" style="display:flex;gap:6px;padding:12px 22px 0;flex-wrap:wrap"></div>
+    <div id="tpList" style="flex:1;overflow-y:auto;padding:14px 22px;
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;align-content:start"></div>
+  </div>
+</div>
+<div id="setPanel" style="display:none;position:fixed;inset:0;z-index:120;
+  background:rgba(5,10,20,.7);padding:12vh 30vw">
+  <div style="background:var(--surface);border:1px solid var(--stroke);border-radius:16px;padding:24px 26px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <b style="font-size:15px">⚙️ 观测设置</b>
+      <button onclick="document.getElementById('setPanel').style.display='none'"
+        style="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:12px;line-height:2.2">
+      <div style="color:var(--t3);font-size:11px;margin-bottom:6px">📍 观测位置(NINA未配置时的推荐基准)</div>
+      <div style="display:flex;gap:10px;margin-bottom:10px">
+        <input id="s_site" placeholder="地点名(如: 北京)" style="flex:1;background:var(--bg);
+          border:1px solid var(--stroke);border-radius:9px;color:var(--text);padding:9px 12px;font-size:13px">
+        <select id="s_city" onchange="cityPreset()" style="background:var(--bg);border:1px solid var(--stroke);
+          border-radius:9px;color:var(--text);padding:9px;font-size:13px">
+          <option value="">常用城市…</option>
+          <option value="39.9,116.4,北京">北京</option><option value="31.2,121.5,上海">上海</option>
+          <option value="23.1,113.3,广州">广州</option><option value="22.5,114.1,深圳">深圳</option>
+          <option value="30.6,104.1,成都">成都</option><option value="34.3,108.9,西安">西安</option>
+          <option value="45.8,126.5,哈尔滨">哈尔滨</option><option value="43.9,125.3,长春">长春</option>
+          <option value="39.9,116.4,天津">天津</option><option value="37.9,112.6,太原">太原</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <input id="s_lat" placeholder="纬度 (39.9)" type="number" step="0.1" style="flex:1;background:var(--bg);
+          border:1px solid var(--stroke);border-radius:9px;color:var(--text);padding:9px 12px;font-size:13px">
+        <input id="s_lon" placeholder="经度 (116.4)" type="number" step="0.1" style="flex:1;background:var(--bg);
+          border:1px solid var(--stroke);border-radius:9px;color:var(--text);padding:9px 12px;font-size:13px">
+      </div>
+      <div style="color:var(--t3);font-size:11px;margin-bottom:6px">🔭 望远镜(用于焦段匹配建议)</div>
+      <div style="display:flex;gap:10px;margin-bottom:20px">
+        <input id="s_tname" placeholder="望远镜名(如: 信达小黑)" style="flex:1;background:var(--bg);
+          border:1px solid var(--stroke);border-radius:9px;color:var(--text);padding:9px 12px;font-size:13px">
+        <input id="s_focal" placeholder="焦距mm(如: 750)" type="number" style="width:130px;background:var(--bg);
+          border:1px solid var(--stroke);border-radius:9px;color:var(--text);padding:9px 12px;font-size:13px">
+      </div>
+      <div style="color:var(--t3);font-size:11px;margin:14px 0 6px">🤖 模型服务(填几个测几个, 全部OpenAI兼容)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px">
+        <div><span style="font-size:11px;color:var(--t3)">DeepSeek</span><input id="s_ds" placeholder="sk-…" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:8px 10px;font-size:11.5px;font-family:Consolas,monospace"></div>
+        <div><span style="font-size:11px;color:var(--t3)">智谱GLM</span><input id="s_zp" placeholder="…" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:8px 10px;font-size:11.5px;font-family:Consolas,monospace"></div>
+        <div><span style="font-size:11px;color:var(--t3)">Kimi</span><input id="s_ms" placeholder="sk-…" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:8px 10px;font-size:11.5px;font-family:Consolas,monospace"></div>
+        <div><span style="font-size:11px;color:var(--t3)">通义千问</span><input id="s_qw" placeholder="sk-…" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:8px 10px;font-size:11.5px;font-family:Consolas,monospace"></div>
+        <div><span style="font-size:11px;color:var(--t3)">豆包</span><input id="s_db" placeholder="…" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:8px 10px;font-size:11.5px;font-family:Consolas,monospace"></div>
+        <div><span style="font-size:11px;color:var(--t3)">MiniMax</span><input id="s_mm" placeholder="…" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:8px 10px;font-size:11.5px;font-family:Consolas,monospace"></div>
+        <div><span style="font-size:11px;color:var(--t3)">OpenAI</span><input id="s_oa" placeholder="sk-…" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:8px 10px;font-size:11.5px;font-family:Consolas,monospace"></div>
+        <div><span style="font-size:11px;color:var(--t3)">Gemini</span><input id="s_gm" placeholder="AIza…" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:8px 10px;font-size:11.5px;font-family:Consolas,monospace"></div>
+        <div style="grid-column:1/-1"><span style="font-size:11px;color:var(--t3)">OpenRouter</span><input id="s_or" placeholder="sk-or-…(一个key通吃全球模型)" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:8px 10px;font-size:11.5px;font-family:Consolas,monospace"></div>
+      </div>
+      <div style="color:var(--t3);font-size:11px;margin-bottom:6px">🔧 自定义(任意OpenAI兼容: vLLM/LM Studio/中转站)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px">
+        <div style="grid-column:1/-1"><span style="font-size:11px;color:var(--t3)">接口地址</span><input id="s_cu" placeholder="http://192.168.1.100:8000/v1" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:8px 10px;font-size:11.5px;font-family:Consolas,monospace"></div>
+        <div><span style="font-size:11px;color:var(--t3)">模型名</span><input id="s_cm" placeholder="Qwen2.5-32B" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:8px 10px;font-size:11.5px"></div>
+        <div><span style="font-size:11px;color:var(--t3)">API Key</span><input id="s_ck" placeholder="…" style="width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:8px 10px;font-size:11.5px;font-family:Consolas,monospace"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--t3)">路由策略</span>
+        <select id="s_route" style="background:var(--bg);border:1px solid var(--stroke);border-radius:8px;color:var(--text);padding:7px;font-size:11.5px">
+          <option value="auto">auto 智能顺序</option>
+          <option value="cloud">cloud 云端优先</option>
+          <option value="local">local 纯本地</option>
+        </select>
+      </div>
+      <button onclick="saveSettings()" style="width:100%;padding:11px;border:none;border-radius:10px;
+        background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer">💾 保存设置</button>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button onclick="testModel()" style="flex:1;padding:9px;border:1px solid var(--stroke);border-radius:10px;
+          background:none;color:var(--t3);font-size:12px;cursor:pointer">🔌 测试模型连通</button>
+        <span id="testModelRes" style="font-size:11px;color:var(--t3);align-self:center"></span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="main">
+  <!-- ═══ 左栏: 设备控制组(赤道仪→相机→滤轮) ═══ -->
+  <div class="col col-l">
+    <div class="dash">
+      <div class="dash-head"><span class="dash-title">设备控制</span><span style="font-size:9px;color:var(--t3)">8s刷新</span></div>
+      <div class="dsec"><div class="dsec-h">▍赤道仪</div><div id="monMount" class="mon">…</div></div>
+      <div class="dsec" style="border-top:1px solid rgba(70,100,160,.1)"><div class="dsec-h">▍相机</div><div id="monCam" class="mon">…</div></div>
+      <div class="dsec" style="border-top:1px solid rgba(70,100,160,.1)"><div class="dsec-h">▍滤轮</div><div id="monFw" class="mon">…</div></div>
+    </div>
+    <!-- 对话区(左栏下半: AI指挥) -->
+    <div class="chatbox">
+      <div class="dsec-h" style="padding:2px 4px 6px">▍AI 对话</div>
+      <div id="msgs"></div>
+      <div class="inputbar">
+        <textarea id="input" placeholder="用中文下达天文指令… (Enter发送)"></textarea>
+        <button class="send" id="send">发送</button>
+      </div>
+    </div>
+  </div>
+  <!-- ═══ 中栏: 实时画面(2/3高)+双图表 ═══ -->
+  <div class="col col-m">
+    <div class="bigimg">
+      <img id="monImg"/>
+      <span id="monImgTip">等待首帧 — 序列启动后自动显示最新曝光</span>
+    </div>
+    <div class="chart-row">
+      <div class="chartbox"><div class="dsec-h">▍云量趋势 (2h)</div>
+        <svg id="wxTrend" width="100%" height="100%" viewBox="0 0 400 80" preserveAspectRatio="none"></svg>
+        <span class="chart-tip" id="wxTip">采集中…每2分钟一点</span></div>
+      <div class="chartbox"><div class="dsec-h">▍HFR 曲线</div>
+        <svg id="hfrSvg" width="100%" height="100%" viewBox="0 0 400 80" preserveAspectRatio="none"></svg>
+        <span class="chart-tip" id="hfrTip">序列运行后显示</span></div>
+    </div>
+  </div>
+  <!-- ═══ 右栏: 辅助设备+气象+事件 ═══ -->
+  <div class="col col-r">
+    <div class="dash">
+      <div class="dash-head"><span class="dash-title">辅助设备</span><span style="font-size:9px;color:var(--t3)">8s刷新</span></div>
+      <div class="dsec"><div class="dsec-h">▍导星</div><div id="monGuide" class="mon">…</div></div>
+      <div class="dsec" style="border-top:1px solid rgba(70,100,160,.1)"><div class="dsec-h">▍电调</div><div id="monFoc" class="mon">…</div></div>
+      <div class="dsec" style="border-top:1px solid rgba(70,100,160,.1)"><div class="dsec-h">▍旋转器</div><div id="monRot" class="mon">…</div></div>
+    </div>
+    <div class="dash">
+      <div class="dash-head"><span class="dash-title">气象环境</span><span style="font-size:9px;color:var(--t3)">8s刷新</span></div>
+      <div id="monWx" class="mon" style="padding:8px 10px">…</div>
+    </div>
+    <div class="dash" style="flex:1;min-height:110px">
+      <div class="dash-head"><span class="dash-title">实时事件</span></div>
+      <div class="events" id="evtBox" style="padding:6px 12px">等待事件…</div>
+    </div>
+  </div>
+</div>
+<!-- ═══ 底部通栏: 快捷指令 ═══ -->
+<div class="quickbar">
+  <span class="dim" style="font-size:10px;letter-spacing:2px">快捷指令</span>
+  <button onclick="quick('查看设备总览')">设备总览</button>
+  <button onclick="quick('查看相机参数')">相机参数</button>
+  <button onclick="quick('把CCD制冷到零下10度')">CCD降温</button>
+  <button onclick="quick('开始自动对焦')">自动对焦</button>
+  <button onclick="quick('今晚拍什么')">今晚拍什么</button>
+  <button onclick="quick('查看天气是否安全')">天气检查</button>
+  <button onclick="quick('停泊赤道仪')">停泊</button>
+  <button onclick="makeReport(event)" style="border-color:var(--accent);color:var(--accent)">📄 生成观测报告</button>
+</div></div></div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id)||{innerHTML:"",textContent:"",style:{},classList:{add(){},toggle(){}},appendChild(){},addEventListener(){},focus(){},value:""};
+let sid="";
+try{sid=localStorage.getItem("sp_sid")||""}catch(e){}
+const _LS={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
+
+async function send(text){
+  if(!text||send.busy)return; send.busy=true;
+  addMsg("user",text);
+  $("send").disabled=true;$("input").value="";
+  const m=addMsg("ai","思考中…");
+  try{
+    const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({message:text,session_id:sid})});
+    const d=await r.json();
+    sid=d.session_id;_LS.set("sp_sid",sid);
+    m.querySelector(".bub").textContent=d.reply;
+    m.querySelector(".meta").textContent=`星枢 · ${d["耗时秒"]}s · ${d["通道"]}`;
+  }catch(e){
+    m.querySelector(".bub").textContent="❌ 连接失败: "+e.message;
+  }
+  send.busy=false;$("send").disabled=false;$("input").focus();
+}
+function addMsg(role,text){
+  const div=document.createElement("div");div.className="m "+role;
+  div.innerHTML=`<div class="bub"></div><div class="meta"></div>`;
+  div.querySelector(".bub").textContent=text;
+  $("msgs").appendChild(div);
+  $("msgs").scrollTop=1e9;
+  return div;
+}
+function quick(t){send(t)}
+$("send").onclick=()=>send($("input").value);
+$("input").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send($("input").value)}};
+
+/* WebSocket事件流 → 侧栏状态 */
+function connectWS(){
+  const ws=new WebSocket(`ws://${location.host}/ws/astro_events`);
+  ws.onopen=()=>{$("connDot").className="dot on"};
+  ws.onclose=()=>{$("connDot").className="dot off";setTimeout(connectWS,3000)};
+  ws.onmessage=ev=>{
+    const d=JSON.parse(ev.data);
+    if(["提醒","进度","整点报时"].includes(d.类型)){renderNotice(d);return;}
+    if(d.类型==="状态"&&d.内容){
+      const s=d.内容;
+      let h="";
+      const cam=s.数据&&s.数据.Camera||s.Camera;
+      if(cam)h+=`<div class="kv"><span>相机</span><b>${cam.相机状态||cam.CameraState||"-"}</b></div>
+        <div class="kv"><span>CCD温度</span><b>${cam.温度??cam.Temperature?? "-"}℃</b></div>`;
+      h+=`<div class="kv"><span>更新</span><b>${new Date().toLocaleTimeString()}</b></div>`;
+      const db=$("devBox"); if(db) db.innerHTML=h;
+    }
+  };
+}
+connectWS();
+/* 天气卡片 */
+async function loadWx(){
+  try{
+    const d=await(await fetch("/api/weather/status")).json();
+    const safe=d.安全===true?`<b class="ok-t">✓ 安全</b>`:d.安全===false?`<b class="warn-t">⚠ 不安全</b>`:`<b>无数据</b>`;
+    /* 旧天气卡已移除 */
+  }catch(e){}
+}
+/* wxBox已移除 — loadWx改为顶栏安全态(不写DOM卡片) */
+async function loadWxSafe(){
+  try{
+    const d=await(await fetch("/api/weather/status")).json();
+    const dot=document.querySelector(".live i");
+    if(dot) dot.style.background = d.安全===false ? "var(--danger)" : "var(--ok)";
+  }catch(e){}
+}
+loadWxSafe();setInterval(loadWxSafe,30000);
+/* 生成观测报告 */
+async function makeReport(ev){
+  const b=(ev&&ev.target)||document.querySelector(".quickbar button:last-child");
+  const oldTxt=b?b.textContent:"";
+  if(b){b.textContent="生成中…";b.disabled=true}
+  try{
+    const r=await(await fetch("/api/report",{method:"POST"})).json();
+    if(r.ok){ showReport(r.content); }
+    else{ alert("报告失败: "+(r.msg||"未知")) }
+  }catch(e){ alert("请求失败: "+e.message) }
+  if(b){b.textContent=oldTxt;b.disabled=false}
+}
+function showReport(md){
+  const m=document.createElement("div");
+  m.style.cssText="position:fixed;inset:0;background:rgba(5,10,20,.7);z-index:99;display:flex;align-items:center;justify-content:center";
+  const box=document.createElement("div");
+  box.style.cssText="width:720px;max-height:82vh;overflow-y:auto;background:var(--surface);border:1px solid var(--stroke);border-radius:16px;padding:26px 30px";
+  const head=document.createElement("div");
+  head.style.cssText="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px";
+  const title=document.createElement("b"); title.textContent="🌌 观测报告"; title.style.fontSize="15px";
+  const xb=document.createElement("button"); xb.textContent="✕";
+  xb.style.cssText="background:none;border:none;color:var(--t3);font-size:18px;cursor:pointer";
+  xb.onclick=()=>m.remove();
+  head.append(title,xb);
+  const body=document.createElement("div");
+  body.style.cssText="font-size:12.5px;line-height:1.8;white-space:pre-wrap";
+  body.textContent=md;
+  box.append(head,body);
+  m.appendChild(box);
+  m.onclick=e=>{if(e.target===m)m.remove()};
+  document.body.appendChild(m);
+}
+
+/* ═══ 工具箱全屏面板 ═══ */
+let _toolsData=null,_curCat="全部";
+function toggleTools(show){
+  const p=document.getElementById("toolsPanel");
+  p.style.display=show?"flex":"none";
+  if(show&&!_toolsData)loadTools2();
+  if(show)document.getElementById("tpSearch").focus();
+}
+document.getElementById("toolsBtn").onclick=()=>toggleTools(true);
+document.getElementById("tpSearch").oninput=e=>renderTools(e.target.value);
+document.addEventListener("keydown",e=>{if(e.key==="Escape")toggleTools(false)});
+
+async function loadTools2(){
+  try{
+    const d=await(await fetch("/api/tools")).json();
+    _toolsData=d;
+    document.getElementById("tpTotal").textContent=d.total+"个工具 · "+Object.keys(d.categories).length+"类";
+    renderCats();renderTools("");
+  }catch(e){document.getElementById("tpList").innerHTML="<div style='color:var(--t3)'>加载失败</div>"}
+}
+function renderCats(){
+  const cats=["全部",...Object.keys(_toolsData.categories)];
+  document.getElementById("tpCats").innerHTML=cats.map(c=>{
+    const n=c==="全部"?_toolsData.total:_toolsData.categories[c].length;
+    return `<button class="tpcat${c===_curCat?" on":""}" data-c="${c}">${c} ${n}</button>`;
+  }).join("");
+  document.querySelectorAll(".tpcat").forEach(b=>b.onclick=()=>{_curCat=b.dataset.c;renderCats();renderTools(document.getElementById("tpSearch").value)});
+}
+function renderTools(q){
+  q=(q||"").toLowerCase();
+  const box=document.getElementById("tpList");
+  let items=[];
+  if(_curCat==="全部")Object.values(_toolsData.categories).forEach(a=>items.push(...a));
+  else items=_toolsData.categories[_curCat]||[];
+  if(q)items=items.filter(t=>t.name.toLowerCase().includes(q)||t.desc.toLowerCase().includes(q));
+  if(!items.length){box.innerHTML="<div style='color:var(--t3);grid-column:1/-1;text-align:center;padding:40px'>没有匹配的工具</div>";return}
+  const R={"高":"#e05252","中":"#e8a33d","低":"#0c8f6f","无":"#8b98b8"};
+  box.innerHTML=items.map(t=>`
+    <div class="tcard" data-name="${t.name}" data-desc="${t.desc}" title="单击=AI执行 · 双击=直执行">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+        <b style="font-size:13.5px">${t.desc.split("(")[0]}</b>
+        <span style="font-size:9px;padding:1px 7px;border-radius:7px;flex:none;
+          background:${R[t.risk]}22;color:${R[t.risk]}">${t.risk}</span>
+      </div>
+      <div style="font-size:9.5px;color:var(--t3);margin-top:5px;font-family:Consolas,monospace;
+        opacity:.7;letter-spacing:.3px">${t.name}</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.4">
+        ${Object.keys(t.params).length?("参数: "+Object.entries(t.params).map(([k,v])=>k+(v.required?"*":"")).join(", ")):"无参数 · 直接执行"}
+      </div>
+    </div>`).join("");
+}
+let _lastToolClick=0;
+async function runDirect(name,desc){
+  let r=await(await fetch("/api/tool_run",{method:"POST",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify({name})})).json();
+  if(r.need_confirm){
+    if(confirm(r.msg+" — 确认执行?")){
+      r=await(await fetch("/api/tool_run",{method:"POST",
+        headers:{"Content-Type":"application/json"},body:JSON.stringify({name,confirm:true})})).json();
+    }else{return}
+  }
+  const txt=r.result?JSON.stringify(r.result,null,1).slice(0,500):(r.msg||"完成");
+  addMsg("ai","⚡ 直执行 "+name+": "+txt);
+}
+function runTool(name,desc){
+  const now=Date.now();
+  if(now-_lastToolClick<350){ _lastToolClick=now; return; }   // 双击防抖
+  _lastToolClick=now;
+  setTimeout(()=>{
+    if(Date.now()-_lastToolClick>=350){                        // 单击350ms后仍无二击→AI模式
+      toggleTools(false);
+      send("执行工具: "+desc+" (工具名:"+name+")");
+    }
+  },360);
+  // 双击由ondblclick处理
+}
+// 工具卡片事件委托(单击/双击)
+document.getElementById("tpList").addEventListener("click",e=>{
+  const c=e.target.closest(".tcard"); if(!c)return;
+  const name=c.dataset.name, desc=c.dataset.desc;
+  const now=Date.now();
+  if(now-(c._t||0)<350)return;   // 双击窗口内忽略单击
+  c._t=now;
+  setTimeout(()=>{
+    if(Date.now()-(c._t||0)>=340){ toggleTools(false); send("执行工具: "+desc+" (工具名:"+name+")"); }
+  },360);
+});
+document.getElementById("tpList").addEventListener("dblclick",e=>{
+  const c=e.target.closest(".tcard"); if(!c)return;
+  c._t=Date.now();
+  runDirect(c.dataset.name,c.dataset.desc);
+});
+loadTools2._loaded=false;
+function toggleRed(){
+  document.body.classList.toggle("redmode");
+  const on=document.body.classList.contains("redmode");
+  const b=document.getElementById("redBtn");
+  b.textContent=on?"◉ 红光ON":"◐ 红光";
+  b.style.background=on?"rgba(251,113,133,.22)":"rgba(251,113,133,.08)";
+  b.style.borderColor=on?"rgba(251,113,133,.55)":"rgba(251,113,133,.25)";
+}
+/* WS 提醒/进度 → 聊天流 */
+const _origOnMsg=window.onWSEvent;
+function renderNotice(d){
+  const icon={"提醒":"⏰","进度":"📊","整点报时":"🕐"}[d.类型]||"🔔";
+  let txt=icon+" "+d.类型+": "+(d.名||d.目标||"")+" — "+(d.动作||d.已拍||"");
+  if(d.天气){txt+=" | "+d.天气} if(d.设备){txt+=" | "+d.设备}
+  if(d.HFR)txt+=" | HFR "+d.HFR;
+  addMsg("ai",txt);
+}
+async function loadTrends(){
+  try{
+    const d=await(await fetch("/api/trends")).json();
+    // 云量折线
+    if(d.weather && d.weather.length>1){
+      const pts=d.weather.map((w,i)=>{
+        const x=i/(d.weather.length-1)*216+2, y=40-w.cloud/100*36;
+        return x.toFixed(1)+","+y.toFixed(1);
+      }).join(" ");
+      document.getElementById("wxTrend").innerHTML=
+        '<polyline points="'+pts+'" fill="none" stroke="#0ea5b7" stroke-width="1.5"/>'+
+        '<text x="2" y="10" fill="#8b98b8" font-size="8">'+d.weather[0].t+' → '+d.weather[d.weather.length-1].t+'  当前'+d.weather[d.weather.length-1].cloud+'%</text>';
+    }else{
+      document.getElementById("wxTrend").innerHTML='<text x="6" y="24" fill="#8b98b8" font-size="9">采集中…(每2分钟一点)</text>';
+    }
+    // HFR
+    if(d.hfr && d.hfr.length>1){
+      const mx=Math.max(...d.hfr), mn=Math.min(...d.hfr), rg=(mx-mn)||1;
+      const pts=d.hfr.map((v,i)=>{
+        const x=i/(d.hfr.length-1)*216+2, y=38-((v-mn)/rg)*34;
+        return x.toFixed(1)+","+y.toFixed(1);
+      }).join(" ");
+      document.getElementById("hfrCard").innerHTML=
+        '<svg width="100%" height="44" viewBox="0 0 220 44" preserveAspectRatio="none">'+
+        '<polyline points="'+pts+'" fill="none" stroke="#e8a33d" stroke-width="1.5"/></svg>'+
+        '<div style="font-size:10px;color:var(--t3)">HFR '+mn.toFixed(2)+'~'+mx.toFixed(2)+' ('+d.hfr.length+'帧)</div>';
+    }
+  }catch(e){}
+}
+loadTrends(); setInterval(loadTrends, 60000);
+/* ═══ 监控舱 ═══ */
+async function loadMonitor(){
+  try{
+    const d=await(await fetch("/api/monitor")).json();
+    const s=d["序列"];
+    const seq=document.getElementById("monSeq")||document.getElementById("topSeq");
+    if(seq) seq.innerHTML = s.状态!=="空闲"
+      ? `<div style="display:flex;align-items:baseline;gap:14px">
+           <b style="font-size:15px;color:var(--text);font-family:inherit">${s.目标||"运行中"}</b>
+           <span style="font-size:22px;font-weight:800;color:var(--accent);font-family:Consolas">${s.已拍||0}<span style="font-size:10px;color:var(--t3);font-family:inherit"> 张</span></span>
+           ${s.曝光中?'<span class="dot-warn" style="font-size:10px">● EXP</span>':'<span class="dot-on" style="font-size:10px">● RUN</span>'}
+         </div>
+         <div class="pbar"><div style="width:${Math.min(100,(s.已拍||0)%100)}%"></div></div>
+         <div class="kv" style="font-size:10px"><span class="dim">${s.状态}${s.当前曝光?" · "+s.当前曝光+"s/帧":""}</span><span></span></div>`
+      : `<div class="kv"><span class="dim">IDLE</span><span class="dot-off" style="font-size:10px">● 待命</span></div>`;
+    const D=(v,cls)=>`<span class="${cls}" style="font-size:10px">● ${v}</span>`;
+    const m=d["赤道仪"];
+    document.getElementById("monMount").innerHTML=
+      `<div class="kv"><span class="dim">RA</span><b>${m.赤经!=null?m.赤经.toFixed(2):"--"}</b></div>
+       <div class="kv"><span class="dim">DEC</span><b>${m.赤纬!=null?m.赤纬.toFixed(2):"--"}</b></div>
+       <div class="kv"><span class="dim">TRACK</span>${m.跟踪==="开"?D("跟踪","dot-on"):D("停止","dot-off")}</div>`;
+    const g=d["导星"];
+    document.getElementById("monGuide").innerHTML=
+      g.RA误差!=null
+      ? `<div class="kv"><span class="dim">RA</span><b style="color:var(--ok)">${g.RA误差!=null?g.RA误差.toFixed(2):"--"}"</b></div>
+         <div class="kv"><span class="dim">DE</span><b style="color:var(--ok)">${g.DE误差!=null?g.DE误差.toFixed(2):"--"}"</b></div>`
+      : `<div class="kv"><span class="dim">GUIDE</span>${D("关闭","dot-off")}</div>`;
+    const c=d["相机"];
+    document.getElementById("monCam").innerHTML=
+      `<div class="kv"><span class="dim">CCD</span><b style="font-size:14px">${c.温度??"-"}°</b></div>
+       <div class="kv"><span class="dim">COOL</span>${c.制冷==="开"?D(c.功率!=null?c.功率+"%":"开","dot-on"):D("关","dot-off")}</div>
+       <div class="kv"><span class="dim">GAIN</span><b>${c.增益??"-"}</b></div>`;
+    const f=d["电调"];
+    document.getElementById("monFoc").innerHTML=
+      `<div class="kv"><span class="dim">FOCUS</span>${f.在线?D("在线","dot-on"):D("离线","dot-off")}</div>
+       ${f.在线?`<div class="kv"><span class="dim">POS</span><b>${f.位置??"-"}</b></div>
+       ${f.温度!=null?`<div class="kv"><span class="dim">TEMP</span><b>${f.温度.toFixed(2)}°</b></div>`:""}`:""}`;
+    const fw=d["滤轮"];
+    document.getElementById("monFw").innerHTML=
+      `<div class="kv"><span class="dim">FILTER</span>${fw.在线?D("在线","dot-on"):D("离线","dot-off")}</div>
+       ${fw.在线?`<div class="kv"><span class="dim">SLOT</span><b>${fw.数量}档</b></div>
+       <div style="font-size:9.5px;color:var(--t3);line-height:1.6;margin-top:2px">${(fw.列表||[]).slice(0,4).join(" · ")}</div>`:""}`;
+    const ro=d["旋转器"];
+    document.getElementById("monRot").innerHTML=
+      `<div class="kv"><span class="dim">ROT</span>${ro.在线?D("在线","dot-on"):D("离线","dot-off")}</div>
+       ${ro.在线?`<div class="kv"><span class="dim">ANGLE</span><b>${ro.角度??"-"}°</b></div>`:""}`;
+    const w=d["天气"];
+    const cloudCls = w.云量>80?"dot-danger":(w.云量>50?"dot-warn":"dot-on");
+    document.getElementById("monWx").innerHTML=
+      `<div style="display:flex;gap:0;padding:2px 0">
+         <div style="flex:1;text-align:center">
+           <div style="font-size:17px;font-weight:800;font-family:Consolas" class="${cloudCls}">${w.云量!=null?w.云量.toFixed(0):"-"}<span style="font-size:9px">%</span></div>
+           <div style="font-size:9px;color:var(--t3);letter-spacing:2px;margin-top:1px">云量</div></div>
+         <div style="flex:1;text-align:center;border-left:1px solid rgba(70,100,160,.12)">
+           <div style="font-size:17px;font-weight:800;font-family:Consolas">${w.湿度!=null?w.湿度.toFixed(0):"-"}<span style="font-size:9px">%</span></div>
+           <div style="font-size:9px;color:var(--t3);letter-spacing:2px;margin-top:1px">湿度</div></div>
+         <div style="flex:1;text-align:center;border-left:1px solid rgba(70,100,160,.12)">
+           <div style="font-size:17px;font-weight:800;font-family:Consolas">${w.风速!=null?w.风速.toFixed(2):"-"}<span style="font-size:9px">m/s</span></div>
+           <div style="font-size:9px;color:var(--t3);letter-spacing:2px;margin-top:1px">风速</div></div>
+         <div style="flex:1;text-align:center;border-left:1px solid rgba(70,100,160,.12)">
+           <div style="font-size:17px;font-weight:800;font-family:Consolas">${w.温度!=null?w.温度.toFixed(1):"-"}<span style="font-size:9px">°C</span></div>
+           <div style="font-size:9px;color:var(--t3);letter-spacing:2px;margin-top:1px">温度</div></div>
+       </div>`;
+    // 顶栏联动
+    const tt=document.getElementById("topTarget"); if(tt) tt.textContent=s.状态!=="空闲"?(s.目标||"运行中"):"-";
+    // 顶栏天气安全(云量判定)
+    const wxx=d["天气"]; const tw=document.getElementById("topWx");
+    if(tw && wxx.云量!=null){
+      if(wxx.云量>90||wxx.湿度>95){tw.textContent="● 危险";tw.className="dot-danger"}
+      else if(wxx.云量>70){tw.textContent="● 谨慎";tw.className="dot-warn"}
+      else{tw.textContent="● 安全";tw.className="dot-on"}
+    }
+    // 顶栏停泊
+    const pm=d["赤道仪"]; const tp=document.getElementById("topPark");
+    if(tp){
+      if(pm.停泊==="是"){tp.textContent="● 已停泊";tp.className="dot-on"}
+      else if(pm.跟踪==="开"){tp.textContent="● 跟踪中";tp.className="dot-on"}
+      else{tp.textContent="● 未停泊";tp.className="dot-off"}
+    }
+    const ts=document.getElementById("topSeq");
+    if(ts){ if(s.状态!=="空闲"){ts.textContent="● "+(s.曝光中?"EXP":"RUN");ts.className="dot-on";}
+            else{ts.textContent="● IDLE";ts.className="dot-off"} }
+    if(s.状态!=="空闲"){
+      const img=document.getElementById("monImg");
+      img.src="/api/last_image?t="+Date.now();
+      img.style.display="block";
+      img.onload=()=>{document.getElementById("monImgTip").style.display="none"};
+      img.onerror=()=>{img.style.display="none"};
+    }
+  }catch(e){}
+}
+setInterval(()=>{const t=document.getElementById("topTime");if(t)t.textContent=new Date().toLocaleTimeString("zh-CN",{hour12:false})},1000);
+loadMonitor(); setInterval(loadMonitor, 8000);
+addMsg("ai","你好, 我是星枢 · 监控台已就绪。中文指令控制NINA: 降温/对焦/GOTO/序列。");
+/* 首次运行引导: 无Key自动弹设置 */
+(async()=>{
+  try{
+    const d=await(await fetch("/api/settings")).json();
+    if(!d.HAS_DEEPSEEK && !d.HAS_ZHIPU && !d.STARPIVOT_CHANNELS){
+      setTimeout(()=>{document.getElementById("setBtn").click();
+        addMsg("ai", "👋 欢迎使用星枢! 检测到还没配置模型Key — 请在设置面板填写DeepSeek API Key, 保存后即可开始对话。");
+      },800);
+    }
+  }catch(e){}
+})();
+/* ═══ 设置面板 ═══ */
+document.getElementById("setBtn").onclick=async()=>{
+  const p=document.getElementById("setPanel");
+  p.style.display=p.style.display==="none"?"block":"none";
+  if(p.style.display==="block"){
+    const d=await(await fetch("/api/settings")).json();
+    s_site.value=d.SITE_NAME||""; s_lat.value=d.OBS_LAT||""; s_lon.value=d.OBS_LON||"";
+    s_tname.value=d.TELESCOPE_NAME||""; s_focal.value=d.TELESCOPE_FOCAL||"";
+    const ph=(el,cur)=>{el.value="";el.placeholder=(cur||"未配置")};
+    ph(s_ds,d.DEEPSEEK_API_KEY_MASKED); ph(s_zp,d.ZHIPU_API_KEY_MASKED);
+    ph(s_ms,d.MOONSHOT_API_KEY_MASKED); ph(s_qw,d.QWEN_API_KEY_MASKED);
+    ph(s_db,d.DOUBAO_API_KEY_MASKED); ph(s_mm,d.MINIMAX_API_KEY_MASKED);
+    ph(s_oa,d.OPENAI_API_KEY_MASKED); ph(s_gm,d.GEMINI_API_KEY_MASKED);
+    ph(s_or,d.OPENROUTER_API_KEY_MASKED); ph(s_ck,d.CUSTOM_API_KEY_MASKED);
+    s_cu.value=d.CUSTOM_BASE_URL||""; s_cm.value=d.CUSTOM_MODEL||"";
+    s_route.value=d.MODEL_ROUTE||"auto";
+  }
+};
+function cityPreset(){
+  const v=document.getElementById("s_city").value;
+  if(!v)return;
+  const [la,lo,na]=v.split(",");
+  s_lat.value=la; s_lon.value=lo; s_site.value=na;
+}
+async function testModel(){
+  document.getElementById("testModelRes").textContent="测试中…";
+  try{
+    const r=await(await fetch("/api/test_model",{method:"POST"})).json();
+    document.getElementById("testModelRes").textContent=r.ok?"✅ "+r.msg:"❌ "+r.msg;
+    document.getElementById("testModelRes").style.color=r.ok?"#0c8f6f":"#e05252";
+  }catch(e){document.getElementById("testModelRes").textContent="❌ 请求失败"}
+}
+async function saveSettings(){
+  const body={SITE_NAME:s_site.value||"我的观测点", OBS_LAT:s_lat.value||40.0,
+              OBS_LON:s_lon.value||116.4, TELESCOPE_NAME:s_tname.value||"",
+              TELESCOPE_FOCAL:s_focal.value||"",
+              };
+  const K={s_ds:"DEEPSEEK_API_KEY",s_zp:"ZHIPU_API_KEY",s_ms:"MOONSHOT_API_KEY",
+    s_qw:"QWEN_API_KEY",s_db:"DOUBAO_API_KEY",s_mm:"MINIMAX_API_KEY",
+    s_oa:"OPENAI_API_KEY",s_gm:"GEMINI_API_KEY",s_or:"OPENROUTER_API_KEY",s_ck:"CUSTOM_API_KEY"};
+  for(const[id,k]of Object.entries(K)){const el=document.getElementById(id);if(el&&el.value.trim())body[k]=el.value.trim()}
+  if(s_cu.value.trim())body.CUSTOM_BASE_URL=s_cu.value.trim();
+  if(s_cm.value.trim())body.CUSTOM_MODEL=s_cm.value.trim();
+  body.MODEL_ROUTE=s_route.value;
+  const r=await(await fetch("/api/settings",{method:"POST",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})).json();
+  alert(r.ok?"✅ 已保存, 今晚拍什么的推荐已按新位置计算":"保存失败");
+  if(r.ok)document.getElementById("setPanel").style.display="none";
+}
+</script>
+</body>
+</html>

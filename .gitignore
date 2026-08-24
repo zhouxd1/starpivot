@@ -1,0 +1,30 @@
+# 星枢 StarPivot — 敏感与冗余排除
+# 凭证(绝不提交!)
+.env
+*.key
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 打包产物(GitHub放源码, exe走Release)
+build/
+dist/
+dist2/
+*.exe
+*.spec
+
+# 运行时数据(用户本地生成)
+data/history.db
+data/sessions_cache.json
+data/schedules.json
+reports/
+*.log
+sp_*.log
+run*.log
+
+# 本机路径相关的临时脚本
+add_whitelist.ps1
+key.tmp
