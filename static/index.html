@@ -107,6 +107,38 @@
     .tcard{padding:10px 12px}
   }
 
+
+  /* 设备卡操作行 */
+  .monops{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+  .monops button{padding:3px 10px;border-radius:11px;border:1px solid rgba(80,120,200,.25);
+    background:rgba(25,40,70,.5);color:var(--text);font-size:10.5px;cursor:pointer;transition:all .15s}
+  .monops button:hover{border-color:var(--accent);color:var(--accent);background:rgba(40,70,130,.4)}
+  /* ═══ 豆包式输入容器(上输入+下工具) ═══ */
+  .dinput{background:rgba(14,22,40,.85);border:1px solid rgba(80,120,200,.25);border-radius:18px;
+    overflow:hidden;backdrop-filter:blur(8px);box-shadow:0 8px 28px rgba(0,0,0,.35)}
+  .dinput:focus-within{border-color:rgba(62,207,142,.5);box-shadow:0 8px 28px rgba(0,0,0,.35),0 0 0 3px rgba(62,207,142,.08)}
+  .dinput-top{display:flex;align-items:flex-end;gap:8px;padding:10px 12px 6px}
+  .dinput-top textarea{flex:1;background:none;border:none;outline:none;color:var(--text);
+    font-size:13px;line-height:1.5;resize:none;min-height:38px;max-height:120px;font-family:inherit;
+    padding:9px 0;margin:0;display:flex;align-items:center}
+  .dinput-top textarea::placeholder{line-height:38px}
+  .dinput-top textarea::placeholder{color:rgba(140,160,190,.5)}
+  .send{width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;flex:none;
+    background:linear-gradient(135deg,#3ecf8e,#2ea0d8);color:#fff;font-size:14px;
+    display:flex;align-items:center;justify-content:center;transition:all .15s ease}
+  .send:hover{transform:scale(1.08);box-shadow:0 4px 14px rgba(62,207,142,.4)}
+  .send:active{transform:scale(.95)}
+  .dinput-tools{display:flex;gap:2px;padding:4px 8px 8px;overflow-x:auto;scrollbar-width:none}
+  .dinput-tools .tbtn[style*="order:99"]{position:sticky;right:0;background:rgba(14,22,40,.95);
+    border-radius:14px;box-shadow:-6px 0 12px rgba(10,16,30,.8);z-index:2}
+  .dinput-tools::-webkit-scrollbar{display:none}
+  .tbtn{flex:none;display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border:none;
+    border-radius:14px;background:none;color:rgba(180,200,225,.75);font-size:11.5px;cursor:pointer;
+    white-space:nowrap;transition:all .15s ease}
+  .tbtn span{font-size:13px;filter:grayscale(.15)}
+  .tbtn:hover{background:rgba(50,80,140,.35);color:#fff}
+  .tbtn:hover span{filter:none;transform:scale(1.15)}
+
   /* ═══ 精修: 滚动条/输入/按钮 ═══ */
   ::-webkit-scrollbar{width:8px;height:8px}
   ::-webkit-scrollbar-track{background:transparent}
@@ -162,9 +194,10 @@
   .titem{display:flex;flex-direction:column;gap:1px}
   .titem .dim{font-size:9px;letter-spacing:2px}
   .titem b{font-size:13px;font-family:Consolas,monospace;font-weight:600}
-  .main{flex:1;display:grid;grid-template-columns:3fr 6fr 3fr;gap:10px;padding:10px;overflow:hidden;min-height:0}
+  .main{flex:1;display:grid;grid-template-columns:3fr 5.8fr 3.2fr;gap:10px;padding:10px;overflow:hidden;min-height:0}
   .col{display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0}
-  .col-m .bigimg{flex:2.6;background:linear-gradient(160deg,#030814,#01040c);border:1px solid rgba(70,100,160,.18);
+  .col>*{min-width:0;min-height:0;overflow:hidden}
+  .col-m .bigimg{position:relative;flex:2.6;background:linear-gradient(160deg,#030814,#01040c);border:1px solid rgba(70,100,160,.18);
     border-radius:14px;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:200px;
     box-shadow:0 10px 40px rgba(0,0,0,.5),inset 0 0 80px rgba(20,40,90,.15)}
   .bigimg img{max-width:100%;max-height:100%;object-fit:contain}
@@ -174,7 +207,7 @@
     padding:10px 14px;display:flex;flex-direction:column;position:relative;min-height:0}
   .chartbox svg{flex:1;min-height:0}
   .chart-tip{position:absolute;bottom:8px;left:14px;font-size:9.5px;color:var(--t3);letter-spacing:1px;opacity:.75}
-  .chatbox{flex:1.4;display:flex;flex-direction:column;background:rgba(8,13,26,.6);
+  .chatbox{display:flex;flex-direction:column;background:rgba(8,13,26,.6);
     border:1px solid rgba(70,100,160,.16);border-radius:14px;padding:10px 12px;min-height:150px;overflow:hidden}
   #msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:4px 2px}
   .m{max-width:92%;font-size:12px;line-height:1.65}
@@ -196,7 +229,7 @@
   .quickbar button:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
   .events{font-size:10.5px;color:var(--t3);overflow-y:auto;flex:1;line-height:1.9}
   /* 手机/窄窗回退: 单列 */
-  @media (max-width:1000px){
+  @media (max-width:760px){
     .main{grid-template-columns:1fr;overflow-y:auto}
     .col{min-height:auto}
     .top-mid{display:none}
@@ -317,26 +350,46 @@
 <div class="main">
   <!-- ═══ 左栏: 设备控制组(赤道仪→相机→滤轮) ═══ -->
   <div class="col col-l">
-    <div class="dash">
+    <div class="dash" style="flex:1">
       <div class="dash-head"><span class="dash-title">设备控制</span><span style="font-size:9px;color:var(--t3)">8s刷新</span></div>
       <div class="dsec"><div class="dsec-h">▍赤道仪</div><div id="monMount" class="mon">…</div></div>
       <div class="dsec" style="border-top:1px solid rgba(70,100,160,.1)"><div class="dsec-h">▍相机</div><div id="monCam" class="mon">…</div></div>
       <div class="dsec" style="border-top:1px solid rgba(70,100,160,.1)"><div class="dsec-h">▍滤轮</div><div id="monFw" class="mon">…</div></div>
+      <div class="dsec" style="border-top:1px solid rgba(70,100,160,.1)"><div class="dsec-h">▍导星</div><div id="monGuide" class="mon">…</div></div>
+      <div class="dsec" style="border-top:1px solid rgba(70,100,160,.1)"><div class="dsec-h">▍电调</div><div id="monFoc" class="mon">…</div></div>
+      <div class="dsec" style="border-top:1px solid rgba(70,100,160,.1)"><div class="dsec-h">▍旋转器</div><div id="monRot" class="mon">…</div></div>
     </div>
-    <!-- 对话区(左栏下半: AI指挥) -->
-    <div class="chatbox">
-      <div class="dsec-h" style="padding:2px 4px 6px">▍AI 对话</div>
-      <div id="msgs"></div>
-      <div class="inputbar">
-        <textarea id="input" placeholder="用中文下达天文指令… (Enter发送)"></textarea>
-        <button class="send" id="send">发送</button>
-      </div>
+    <div class="dash">
+      <div class="dash-head"><span class="dash-title">气象环境</span><span style="font-size:9px;color:var(--t3)">8s刷新</span></div>
+      <div id="monWx" class="mon" style="padding:8px 10px">…</div>
     </div>
   </div>
   <!-- ═══ 中栏: 实时画面(2/3高)+双图表 ═══ -->
   <div class="col col-m">
     <div class="bigimg">
-      <img id="monImg"/>
+      <img id="monImg" alt="" style="width:100%;height:100%;object-fit:contain" onerror="this.style.display='none'">
+        <div id="monOverlay" style="position:absolute;inset:0;pointer-events:none;font-family:Consolas,monospace;font-size:11px;line-height:1.6;text-shadow:0 1px 3px #000,0 0 6px rgba(0,0,0,.9)">
+          <div style="position:absolute;top:8px;left:10px">
+            <div id="ovTarget" style="font-size:13px;font-weight:600;color:#e8f4ff">—</div>
+            <div id="ovCoord" style="color:rgba(232,244,255,.75)">RA — DEC —</div>
+          </div>
+          <div style="position:absolute;top:8px;right:10px;text-align:right">
+            <div><span id="ovFilter">● —</span> <span id="ovBin" style="color:rgba(232,244,255,.75)"></span></div>
+            <div id="ovClock" style="color:rgba(232,244,255,.6)"></div>
+          </div>
+          <div style="position:absolute;bottom:8px;left:10px">
+            <span id="ovTemp" style="color:#8ad4ff">—℃</span>
+            <span id="ovGain" style="color:rgba(232,244,255,.75);margin-left:8px"></span>
+          </div>
+          <div style="position:absolute;bottom:8px;right:10px;text-align:right">
+            <div id="ovHfr" style="color:#ffd98a">HFR —</div>
+            <div id="ovGuide" style="color:rgba(232,244,255,.7);font-size:10px"></div>
+          </div>
+          <div id="ovFrame" style="position:absolute;bottom:34px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);border-radius:8px;padding:2px 10px;display:none">
+            <span id="ovFrameTxt">帧 0/0</span>
+            <div style="height:3px;border-radius:2px;background:#2a3f55;margin-top:2px;overflow:hidden"><div id="ovFrameBar" style="height:100%;width:0%;background:linear-gradient(90deg,#3ecf8e,#8ad4ff)"></div></div>
+          </div>
+        </div>/>
       <span id="monImgTip">等待首帧 — 序列启动后自动显示最新曝光</span>
     </div>
     <div class="chart-row">
@@ -348,36 +401,29 @@
         <span class="chart-tip" id="hfrTip">序列运行后显示</span></div>
     </div>
   </div>
-  <!-- ═══ 右栏: 辅助设备+气象+事件 ═══ -->
+  <!-- ═══ 右栏: AI指挥台(常驻) + 事件 ═══ -->
   <div class="col col-r">
-    <div class="dash">
-      <div class="dash-head"><span class="dash-title">辅助设备</span><span style="font-size:9px;color:var(--t3)">8s刷新</span></div>
-      <div class="dsec"><div class="dsec-h">▍导星</div><div id="monGuide" class="mon">…</div></div>
-      <div class="dsec" style="border-top:1px solid rgba(70,100,160,.1)"><div class="dsec-h">▍电调</div><div id="monFoc" class="mon">…</div></div>
-      <div class="dsec" style="border-top:1px solid rgba(70,100,160,.1)"><div class="dsec-h">▍旋转器</div><div id="monRot" class="mon">…</div></div>
+    <div class="chatbox" style="flex:1;display:flex;flex-direction:column;min-height:0">
+      <div class="dash-head" style="margin-bottom:6px"><span class="dash-title">🤖 AI 指挥台</span><span style="font-size:9px;color:var(--t3)">中文指挥全设备</span></div>
+      <div id="msgs" style="flex:1;min-height:0"></div>
+      <div class="dinput">
+        <div class="dinput-top">
+          <textarea id="input" placeholder="发消息… (Enter发送)"></textarea>
+          <button class="send" id="send" title="发送">➤</button>
+        </div>
+        <div class="dinput-tools" id="smartBar">
+          <button class="tbtn" onclick="toggleTools(true)" title="全部136个工具按分类浏览" style="order:99"><span>⊞</span>更多</button>
+        </div>
+      </div>
     </div>
-    <div class="dash">
-      <div class="dash-head"><span class="dash-title">气象环境</span><span style="font-size:9px;color:var(--t3)">8s刷新</span></div>
-      <div id="monWx" class="mon" style="padding:8px 10px">…</div>
+    <div class="dash" style="min-height:130px;max-height:180px">
+      <div class="dash-head"><span class="dash-title">实时事件</span><span style="font-size:9px;color:var(--t3)">系统/设备/天气动态</span></div>
+      <div class="events" id="evtBox" style="padding:6px 12px">
+        <div>⏱ <span id="evtBoot">系统启动中…</span></div>
+        <div>🛰 监控数据每8秒刷新</div>
+        <div>📡 事件流连接后自动推送</div>
+      </div>
     </div>
-    <div class="dash" style="flex:1;min-height:110px">
-      <div class="dash-head"><span class="dash-title">实时事件</span></div>
-      <div class="events" id="evtBox" style="padding:6px 12px">等待事件…</div>
-    </div>
-  </div>
-</div>
-<!-- ═══ 底部通栏: 快捷指令 ═══ -->
-<div class="quickbar">
-  <span class="dim" style="font-size:10px;letter-spacing:2px">快捷指令</span>
-  <button onclick="quick('查看设备总览')">设备总览</button>
-  <button onclick="quick('查看相机参数')">相机参数</button>
-  <button onclick="quick('把CCD制冷到零下10度')">CCD降温</button>
-  <button onclick="quick('开始自动对焦')">自动对焦</button>
-  <button onclick="quick('今晚拍什么')">今晚拍什么</button>
-  <button onclick="quick('查看天气是否安全')">天气检查</button>
-  <button onclick="quick('停泊赤道仪')">停泊</button>
-  <button onclick="makeReport(event)" style="border-color:var(--accent);color:var(--accent)">📄 生成观测报告</button>
-</div></div></div>
   </div>
 </div>
 <script>
@@ -403,15 +449,51 @@ async function send(text){
   }
   send.busy=false;$("send").disabled=false;$("input").focus();
 }
-function addMsg(role,text){
+function addMsg(role,text,html){
   const div=document.createElement("div");div.className="m "+role;
   div.innerHTML=`<div class="bub"></div><div class="meta"></div>`;
-  div.querySelector(".bub").textContent=text;
+  if(html){div.querySelector(".bub").innerHTML=text}else{div.querySelector(".bub").textContent=text}
   $("msgs").appendChild(div);
   $("msgs").scrollTop=1e9;
   return div;
 }
-function quick(t){send(t)}
+
+// ═══ 自适应快捷栏(按使用频率, 越用越懂你) ═══
+const QUICK_POOL = [
+  {cmd:'今晚拍什么', icon:'🌙', def:5},
+  {cmd:'查看设备总览', icon:'🛠', def:4},
+  {cmd:'查看天气是否安全', icon:'🌤', def:3},
+  {cmd:'开始拍巫师星云', icon:'🎬', def:2},
+  {cmd:'把CCD制冷到零下10度', icon:'❄️', def:0},
+  {cmd:'开始自动对焦', icon:'🎯', def:0},
+  {cmd:'查看相机参数', icon:'📷', def:0},
+  {cmd:'停泊赤道仪', icon:'🅿️', def:0},
+  {cmd:'云量趋势怎么样', icon:'📈', def:0},
+  {cmd:'我各目标拍了多久了', icon:'📚', def:0},
+];
+function _qstat(){ try{return JSON.parse(localStorage.getItem('sp_qstat')||'{}')}catch(e){return{}} }
+function _qsave(o){ try{localStorage.setItem('sp_qstat', JSON.stringify(o))}catch(e){} }
+function trackQuick(cmd){
+  const s=_qstat(); s[cmd]=(s[cmd]||0)+1; _qsave(s); renderSmartBar();
+}
+function renderSmartBar(){
+  const bar=document.getElementById('smartBar'); if(!bar)return;
+  // 清旧动态按钮(保留"更多")
+  [...bar.querySelectorAll('.tbtn:not([style*="order:99"])')].forEach(b=>b.remove());
+  const s=_qstat();
+  const ranked=[...QUICK_POOL].sort((a,b)=>((s[b.cmd]||0)+b.def*0.1)-((s[a.cmd]||0)+a.def*0.1)).slice(0,5);
+  // 更多按钮已在HTML(order:99), 只插前列
+  ranked.reverse().forEach(item=>{
+    const b=document.createElement('button');
+    b.className='tbtn'; b.style.order=0;
+    b.onclick=()=>{trackQuick(item.cmd); if(item.cmd==='开始拍巫师星云'){} send(item.cmd)};
+    b.innerHTML='<span>'+item.icon+'</span>'+item.cmd.replace('把CCD制冷到零下10度','CCD降温').replace('查看天气是否安全','天气检查').replace('查看设备总览','设备总览').replace('开始自动对焦','自动对焦').replace('查看相机参数','相机参数').replace('停泊赤道仪','停泊').replace('我各目标拍了多久了','拍摄历史').replace('云量趋势怎么样','云量趋势').replace('开始拍巫师星云','一键开拍');
+    bar.insertBefore(b, bar.firstChild);
+  });
+}
+renderSmartBar();
+
+function quick(t){trackQuick(t);send(t)}
 $("send").onclick=()=>send($("input").value);
 $("input").onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send($("input").value)}};
 
@@ -549,7 +631,7 @@ async function runDirect(name,desc){
   const txt=r.result?JSON.stringify(r.result,null,1).slice(0,500):(r.msg||"完成");
   addMsg("ai","⚡ 直执行 "+name+": "+txt);
 }
-function runTool(name,desc){
+function runTool(name,desc){try{trackQuick(desc||name)}catch(e){};try{trackQuick(desc.split('(')[0]||name)}catch(e){};
   const now=Date.now();
   if(now-_lastToolClick<350){ _lastToolClick=now; return; }   // 双击防抖
   _lastToolClick=now;
@@ -626,6 +708,43 @@ async function loadTrends(){
 }
 loadTrends(); setInterval(loadTrends, 60000);
 /* ═══ 监控舱 ═══ */
+
+// ═══ 实时画面元数据叠加 ═══
+const FCOLOR = {"L":"#e8e8e8","Ha":"#ff6b6b","OIII":"#4ecdc4","SII":"#ffa94d","R":"#ff8787","G":"#69db7c","B":"#74c0fc","LUM":"#e8e8e8","RED":"#ff8787","GREEN":"#69db7c","BLUE":"#74c0fc"};
+function renderOverlay(d){
+  const s=d["序列"]||{}, cam=d["相机"]||{}, m=d["赤道仪"]||{}, g=d["导星"]||{}, fw=d["滤轮"]||{};
+  const fmt=(el,v)=>{const e=document.getElementById(el);if(e)e.textContent=v};
+  // 左上: 目标+坐标
+  fmt("ovTarget", s.目标 && s.目标!=="-" ? s.目标 : "—");
+  if(m.赤经!=null&&m.赤纬!=null){
+    const ra=m.赤经/15, rh=Math.floor(ra), rm=Math.round((ra-rh)*60);
+    const dd=m.赤纬, dsg=dd>=0?"+":"−", da=Math.abs(dd), ddeg=Math.floor(da), dm=Math.round((da-ddeg)*60);
+    fmt("ovCoord","RA "+rh+"h"+String(rm).padStart(2,"0")+"m DEC "+dsg+ddeg+"°"+String(dm).padStart(2,"0")+"′");
+  } else fmt("ovCoord","RA — DEC —");
+  // 右上: 滤镜色点+binning+时钟
+  const fwname=(fw.当前&&fw.当前!=="-")?String(fw.当前):"—";
+  const dot=document.getElementById("ovFilter");
+  if(dot){const fc=FCOLOR[fwname.toUpperCase()]||"#9bb0c4";dot.innerHTML='<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+fc+';box-shadow:0 0 6px '+fc+'"></span> '+fwname}
+  fmt("ovClock",new Date().toLocaleTimeString("zh-CN",{hour12:false}));
+  // 左下: 温度+增益
+  fmt("ovTemp",cam.温度!=null?cam.温度.toFixed(1)+"℃":"—℃");
+  fmt("ovGain",cam.增益!=null&&cam.增益>=0?("G"+cam.增益+" · Bin1x1"):"")
+  // 右下: HFR+导星
+  fmt("ovHfr","HFR —");  // HFR在序列统计里, monitor暂无 → 由帧统计更新
+  fmt("ovGuide",g.RA误差!=null?("导星 "+(g.RA误差!=null?g.RA误差.toFixed(2):"—")+"′′ / "+(g.DE误差!=null?g.DE误差.toFixed(2):"—")+"′′"):"")
+  // 中央: 帧进度
+  const fb=document.getElementById("ovFrame");
+  if(fb){
+    if(s.状态&&s.状态!=="空闲"&&(s.已拍||s.曝光中)){
+      fb.style.display="block";
+      const total=s.总帧数||60;
+      fmt("ovFrameTxt","帧 "+(s.已拍||0)+"/"+total+(s.曝光中?" ● EXP":""));
+      const bar=document.getElementById("ovFrameBar");
+      if(bar)bar.style.width=Math.min(100,(s.已拍||0)/total*100)+"%";
+    } else fb.style.display="none";
+  }
+}
+
 async function loadMonitor(){
   try{
     const d=await(await fetch("/api/monitor")).json();
@@ -644,19 +763,27 @@ async function loadMonitor(){
     const m=d["赤道仪"];
     document.getElementById("monMount").innerHTML=
       `<div class="kv"><span class="dim">RA</span><b>${m.赤经!=null?m.赤经.toFixed(2):"--"}</b></div>
-       <div class="kv"><span class="dim">DEC</span><b>${m.赤纬!=null?m.赤纬.toFixed(2):"--"}</b></div>
-       <div class="kv"><span class="dim">TRACK</span>${m.跟踪==="开"?D("跟踪","dot-on"):D("停止","dot-off")}</div>`;
+       <div class="kv"><span class="dim">DEC</span><b>${m.赤纬!=null?(m.赤纬>=0?"+":"")+m.赤纬.toFixed(2):"--"}</b></div>
+       <div class="kv"><span class="dim">TRACK</span>${m.跟踪&&m.跟踪!=="关"?D(m.跟踪,"dot-on"):D("停止","dot-off")}</div>
+       ${m.高度!=null?`<div class="kv"><span class="dim">ALT/AZ</span><b>${m.高度.toFixed(1)}° / ${m.方位!=null?m.方位.toFixed(0):"--"}°</b></div>`:""}
+       ${m.LST?`<div class="kv"><span class="dim">LST</span><b>${String(m.LST).slice(0,8)}</b></div>`:""}
+       ${m.镜架&&m.镜架!=="None"?`<div class="kv"><span class="dim">PIER</span><b>${m.镜架==="West"||m.镜架==="西"?"西镜架":m.镜架==="East"||m.镜架==="东"?"东镜架":m.镜架}</b></div>`:""}
+       <div class="monops"><button onclick="quick('停泊赤道仪')">🅿 停泊</button><button onclick="quick('今晚拍什么')">🌙 选目标</button></div>`;
     const g=d["导星"];
     document.getElementById("monGuide").innerHTML=
       g.RA误差!=null
       ? `<div class="kv"><span class="dim">RA</span><b style="color:var(--ok)">${g.RA误差!=null?g.RA误差.toFixed(2):"--"}"</b></div>
          <div class="kv"><span class="dim">DE</span><b style="color:var(--ok)">${g.DE误差!=null?g.DE误差.toFixed(2):"--"}"</b></div>`
-      : `<div class="kv"><span class="dim">GUIDE</span>${D("关闭","dot-off")}</div>`;
+      : `<div class="kv"><span class="dim">GUIDE</span>${D("关闭","dot-off")}</div>
+        <div class="monops"><button onclick="quick('一键连接所有设备')">🔗 连接</button><button onclick="quick('开始导星')">▶ 开始导星</button></div>`;
     const c=d["相机"];
     document.getElementById("monCam").innerHTML=
       `<div class="kv"><span class="dim">CCD</span><b style="font-size:14px">${c.温度??"-"}°</b></div>
        <div class="kv"><span class="dim">COOL</span>${c.制冷==="开"?D(c.功率!=null?c.功率+"%":"开","dot-on"):D("关","dot-off")}</div>
-       <div class="kv"><span class="dim">GAIN</span><b>${c.增益??"-"}</b></div>`;
+       <div class="kv"><span class="dim">GAIN</span><b>${c.增益??"-"}</b></div>
+       ${c.偏置!=null?`<div class="kv"><span class="dim">OFFSET</span><b>${c.偏置}</b></div>`:""}
+       <div class="kv"><span class="dim">BIN</span><b>${c.Bin||"1x1"}</b></div>
+       <div class="monops"><button onclick="quick('把CCD制冷到零下10度')">❄️ -10℃</button><button onclick="quick('停止制冷')">⏹ 停制冷</button></div>`;
     const f=d["电调"];
     document.getElementById("monFoc").innerHTML=
       `<div class="kv"><span class="dim">FOCUS</span>${f.在线?D("在线","dot-on"):D("离线","dot-off")}</div>
@@ -676,7 +803,7 @@ async function loadMonitor(){
     document.getElementById("monWx").innerHTML=
       `<div style="display:flex;gap:0;padding:2px 0">
          <div style="flex:1;text-align:center">
-           <div style="font-size:17px;font-weight:800;font-family:Consolas" class="${cloudCls}">${w.云量!=null?w.云量.toFixed(0):"-"}<span style="font-size:9px">%</span></div>
+           <div style="font-size:17px;font-weight:800;font-family:Consolas" class="${cloudCls}"><span style="${w.云量>90?'color:#ff6b6b;font-weight:700':(w.云量>70?'color:#ffd43b':'')}">${w.云量!=null?w.云量.toFixed(0):"-"}</span><span style="font-size:9px">%</span>${w.云量>70&&w.云量<=90?'<div style="font-size:8.5px;color:#ffd43b">距危险'+(90-Math.round(w.云量))+'%</div>':''}</div>
            <div style="font-size:9px;color:var(--t3);letter-spacing:2px;margin-top:1px">云量</div></div>
          <div style="flex:1;text-align:center;border-left:1px solid rgba(70,100,160,.12)">
            <div style="font-size:17px;font-weight:800;font-family:Consolas">${w.湿度!=null?w.湿度.toFixed(0):"-"}<span style="font-size:9px">%</span></div>
@@ -690,11 +817,14 @@ async function loadMonitor(){
        </div>`;
     // 顶栏联动
     const tt=document.getElementById("topTarget"); if(tt) tt.textContent=s.状态!=="空闲"?(s.目标||"运行中"):"-";
+    renderOverlay(d);
     // 顶栏天气安全(云量判定)
     const wxx=d["天气"]; const tw=document.getElementById("topWx");
     if(tw && wxx.云量!=null){
       if(wxx.云量>90||wxx.湿度>95){tw.textContent="● 危险";tw.className="dot-danger"}
-      else if(wxx.云量>70){tw.textContent="● 谨慎";tw.className="dot-warn"}
+      else if(wxx.云量>70){
+        const gap=90-Math.round(wxx.云量);
+        tw.textContent="● 谨慎(距危险"+gap+"%)";tw.className="dot-warn"}
       else{tw.textContent="● 安全";tw.className="dot-on"}
     }
     // 顶栏停泊
@@ -718,7 +848,7 @@ async function loadMonitor(){
 }
 setInterval(()=>{const t=document.getElementById("topTime");if(t)t.textContent=new Date().toLocaleTimeString("zh-CN",{hour12:false})},1000);
 loadMonitor(); setInterval(loadMonitor, 8000);
-addMsg("ai","你好, 我是星枢 · 监控台已就绪。中文指令控制NINA: 降温/对焦/GOTO/序列。");
+addMsg("ai", "你好, 我是星枢 🌌<br><br>试试这些指令:<br>· <b>今晚拍什么</b> — 智能推荐目标+最佳时段<br>· <b>巫师星云怎么拍</b> — 完整拍摄参数<br>· <b>开始拍巫师星云</b> — 一键GOTO+导星+序列<br>· <b>CCD降到零下10度</b> — 制冷控制<br><br>右侧工具箱有136个工具, 下方快捷栏会记住你的常用 👇", true);
 /* 首次运行引导: 无Key自动弹设置 */
 (async()=>{
   try{

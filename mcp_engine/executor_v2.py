@@ -182,15 +182,30 @@ async def execute_tool(name: str, args: dict = None) -> dict:
         for dev in devs:
             try:
                 r = await client.get(f"{BASE}/equipment/{dev}/{action}", timeout=15)
-                ok = r.status_code == 200
-                results[dev] = "✓" if ok else f"✗{r.status_code}"
+                body = r.json() if r.status_code == 200 else {}
+                ok = r.status_code == 200 and body.get("Success") is True
+                results[dev] = "✓" if ok else f"✗{body.get('Error') or body.get('StatusCode') or r.status_code}"
                 ok_cnt += ok
             except Exception as e:
-                results[dev] = f"✗超时"
-        return {"状态": f"批量{'连接' if action == 'connect' else '断开'}完成",
-                f"成功": f"{ok_cnt}/{len(devs)}",
+                results[dev] = "✗超时"
+        # 连接后实测各设备真实状态(防假成功)
+        real_online = []
+        if action == "connect":
+            for dev in devs[:6]:
+                try:
+                    r2 = await client.get(f"{BASE}/equipment/{dev}/info", timeout=8)
+                    d2 = r2.json().get("Response", {}) if r2.status_code == 200 else {}
+                    if d2.get("Connected"):
+                        real_online.append(dev)
+                except Exception:
+                    pass
+        verdict = (f"实际在线: {', '.join(real_online) if real_online else '无 — 请检查NINA里是否已选好设备并手动连接一次'}"
+                   if action == "connect" else "")
+        return {"状态": f"批量{'连接' if action == 'connect' else '断开'}请求已发出",
+                f"API成功": f"{ok_cnt}/{len(devs)}",
+                "实际验证": verdict,
                 "明细": results,
-                "提示": "未配置的设备报错属正常, 已连接设备均已被处理"}
+                "提示": "未配置/未选择的设备连接失败属正常;关键看'实际验证'里哪些设备真的在线"}
 
     # 设备总览精简: equipment_info返回压缩版(每设备一行, 防超长截断丢设备)
     if name == "equipment_info":

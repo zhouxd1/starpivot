@@ -42,6 +42,7 @@ from astro_agent.ollama_client import ModelRouter
 from mcp_engine.executor_v2 import execute_tool as execute_en, llm_tools as tools_schema_for_llm, client as nina_client, BASE as NINA_BASE
 import logging
 log = logging.getLogger("starpivot")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
 
 app = FastAPI(title="星枢天文AI助手")
 router_llm = ModelRouter()
@@ -288,6 +289,83 @@ async def api_tonight(v: str = None):
     return r
 
 
+
+
+# ═══ 飞书告警(复用用户的新bot通道) ═══
+FEISHU_CFG_P = ROOT / ".env.alert"
+_alert_state = {"danger_sent": False, "seq_done_sent": False, "last_seq_count": 0, "guide_lost_sent": False}
+
+
+def _load_alert_cfg():
+    cfg = {}
+    if FEISHU_CFG_P.exists():
+        for l in FEISHU_CFG_P.read_text(encoding="utf-8").splitlines():
+            if "=" in l and not l.startswith("#"):
+                k, v = l.split("=", 1)
+                cfg[k.strip()] = v.strip()
+    return cfg
+
+
+def push_feishu_alert(text):
+    """通过飞书bot推送告警(静默失败,不打断主流程)"""
+    import urllib.request
+    try:
+        cfg = _load_alert_cfg()
+        if not (cfg.get("ALERT_APP_ID") and cfg.get("ALERT_APP_SECRET") and cfg.get("ALERT_CHAT")):
+            return
+        req = urllib.request.Request(
+            "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+            data=json.dumps({"app_id": cfg["ALERT_APP_ID"], "app_secret": cfg["ALERT_APP_SECRET"]}).encode(),
+            headers={"Content-Type": "application/json"})
+        tok = json.loads(urllib.request.urlopen(req, timeout=8).read())
+        if tok.get("code") != 0:
+            return
+        t = tok["tenant_access_token"]
+        req2 = urllib.request.Request(
+            "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id",
+            data=json.dumps({"receive_id": cfg["ALERT_CHAT"],
+                             "content": json.dumps({"text": text[:3000]}, ensure_ascii=False),
+                             "msg_type": "text"}).encode(),
+            headers={"Content-Type": "application/json", "Authorization": "Bearer " + t})
+        r2 = json.loads(urllib.request.urlopen(req2, timeout=8).read())
+        log.warning(f"飞书告警结果: code={r2.get(chr(99)+chr(111)+chr(100)+chr(101))} {text[:36]}")  # warning级别确保可见
+    except Exception as e:
+        import traceback
+        log.warning(f"飞书告警失败: {traceback.format_exc()[-200:]}")
+
+
+def check_alerts(d):
+    """监控数据驱动的告警判定(在api_monitor后调用)"""
+    # 危险天气(只报一次, 恢复后重置)
+    wx = d.get("天气", {})
+    cloud = wx.get("云量")
+    if isinstance(cloud, (int, float)) and cloud == cloud:
+        if (cloud > 90) and not _alert_state["danger_sent"]:
+            push_feishu_alert(f"🔴 星枢·天气危险: 云量{cloud:.0f}% 超阈值90% — 请检查是否需要收设备!")
+            _alert_state["danger_sent"] = True
+        elif cloud <= 80 and _alert_state["danger_sent"]:
+            push_feishu_alert(f"🟢 星枢·天气恢复: 云量降到{cloud:.0f}%, 可继续拍摄")
+            _alert_state["danger_sent"] = False
+    # 序列完成
+    seq = d.get("序列", {})
+    cnt = seq.get("已拍") or 0
+    if _alert_state["last_seq_count"] > 0 and cnt == 0 and seq.get("状态") in ("空闲", "Completed", "Finished"):
+        if not _alert_state["seq_done_sent"]:
+            push_feishu_alert(f"✅ 星枢·拍摄序列完成! 共{_alert_state['last_seq_count']}张 — 收工愉快 🌌")
+            _alert_state["seq_done_sent"] = True
+    if cnt > 0:
+        _alert_state["last_seq_count"] = cnt
+        _alert_state["seq_done_sent"] = False
+    # 导星失锁(状态从非idle变成Lost)
+    g = d.get("导星", {})
+    gst = str(g.get("状态", ""))
+    if "lost" in gst.lower() and not _alert_state["guide_lost_sent"]:
+        push_feishu_alert("⚠️ 星枢·导星失锁! 序列可能暂停 — 请检查")
+        _alert_state["guide_lost_sent"] = True
+    elif "lost" not in gst.lower():
+        _alert_state["guide_lost_sent"] = False
+
+
 # ---------- 监控舱(右侧聚合数据) ----------
 def _n(v):
     """NaN清洗"""
@@ -314,7 +392,7 @@ async def api_monitor(v: str = None):
         g("/equipment/focuser/info"), g("/equipment/rotator/info"),
         g("/equipment/switch/info"))
     seqd = seq if isinstance(seq, dict) else {}
-    return {
+    result = {
         "序列": {"状态": str(seqd.get("Status", "空闲"))[:16],
                  "目标": seqd.get("TargetName", "-"),
                  "已拍": seqd.get("ImageCount", 0),
@@ -323,11 +401,13 @@ async def api_monitor(v: str = None):
         "相机": {"温度": cam.get("Temperature"), "目标温度": cam.get("TargetTemp"),
                   "制冷": "开" if cam.get("CoolerOn") else "关",
                   "功率": cam.get("CoolerPower"), "增益": cam.get("Gain"),
+                  "偏置": cam.get("Offset"), "Bin": f"{cam.get('BinX') or 1}x{cam.get('BinY') or 1}",
                   "状态": str(cam.get("CameraState", "-"))[:12]},
         "赤道仪": {"赤经": mount.get("RightAscension"), "赤纬": mount.get("Declination"),
-                    "跟踪": "开" if mount.get("Tracking") else "关",
-                    "停泊": "是" if mount.get("AtPark") else "否",
-                    "高度": mount.get("Altitude") if isinstance(mount.get("Altitude"), (int, float)) else None},
+                            "跟踪": "恒星速" if mount.get("TrackingEnabled") else "关",
+                            "停泊": "是" if mount.get("AtPark") else "否",
+                            "高度": _n(mount.get("Altitude")), "方位": _n(mount.get("Azimuth")),
+                            "LST": mount.get("SiderealTime"), "镜架": mount.get("SideOfPier")},
         "导星": {"状态": str(guider.get("State", "-"))[:12],
                   "RA误差": guider.get("RAError"), "DE误差": guider.get("DEError")},
         "天气": {"云量": wx.get("CloudCover"), "湿度": wx.get("Humidity"),
@@ -343,6 +423,11 @@ async def api_monitor(v: str = None):
                     "机械位": rot.get("MechanicalPosition"), "移动中": bool(rot.get("IsMoving"))},
         "开关": {"在线": bool(sw.get("Connected"))},
     }
+    try:
+        check_alerts(result)
+    except Exception as _e:
+        log.warning(f'check_alerts异常: {_e}')
+    return result
 
 
 @app.get("/api/last_image")
@@ -411,13 +496,35 @@ async def api_trends():
 WX_SAMPLES = []
 
 
+_wx_nan_streak = 0
+
+async def _wx_reconnect():
+    """天气源断连自愈: 重连NINA的OpenMeteo"""
+    try:
+        r = await nina_client.get(f"{NINA_BASE}/equipment/weather/connect", timeout=10)
+        ok = r.status_code == 200
+        log.info(f"天气源自愈重连: {'成功' if ok else '失败'}")
+        return ok
+    except Exception as e:
+        log.warning(f"天气重连异常: {e}")
+        return False
+
+
 async def _wx_sampler():
-    """每2分钟采一次天气, 攒60点(2小时)"""
+    """每2分钟采一次天气, 攒60点(2小时); NaN连续3次自动重连"""
     while True:
         try:
             r = await nina_client.get(f"{NINA_BASE}/equipment/weather/info", timeout=6)
             d = r.json().get("Response", {})
             cloud, hum = d.get("CloudCover"), d.get("Humidity")
+            global _wx_nan_streak
+            if isinstance(cloud, (int, float)) and cloud == cloud:
+                _wx_nan_streak = 0
+            else:
+                _wx_nan_streak += 1
+                if _wx_nan_streak >= 3:
+                    await _wx_reconnect()
+                    _wx_nan_streak = 0
             if isinstance(cloud, (int, float)) and cloud == cloud:
                 WX_SAMPLES.append({"t": f"{datetime.now():%H:%M}", "cloud": cloud,
                                    "hum": hum if isinstance(hum, (int, float)) else None,

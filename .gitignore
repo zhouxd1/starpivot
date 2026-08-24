@@ -1,6 +1,7 @@
 # 星枢 StarPivot — 敏感与冗余排除
 # 凭证(绝不提交!)
 .env
+.env.alert
 *.key
 
 # Python
