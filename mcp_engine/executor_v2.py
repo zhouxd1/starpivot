@@ -82,6 +82,37 @@ async def execute_tool(name: str, args: dict = None) -> dict:
     args = args or {}
 
     # 一键开拍工作流
+    # ═══ 本地工具路由(星枢自研工作流) ═══
+    if name == "multi_schedule":
+        from astro_agent.planner import multi_schedule as _ms
+        lat, lon, _loc = await _detect_location()
+        wants = args.get("目标", args.get("names", []))
+        if isinstance(wants, str):
+            wants = [w.strip() for w in wants.split(",") if w.strip()]
+        return _ms(wants, lat=lat, lon=lon)
+
+    if name == "obs_report":
+        from astro_agent.report_gen import build_report
+        return build_report(args.get("目标", ""))
+
+    if name == "history_export":
+        from astro_agent.history import export_history
+        return export_history(args.get("路径"))
+
+    if name == "history_import":
+        from astro_agent.history import import_history
+        return import_history(args.get("路径", ""))
+
+    if name == "camera_match":
+        from astro_agent.param_calc import match_camera
+        return match_camera(float(args.get("焦距", 750)), float(args.get("视宁度", 2.0)))
+
+    if name == "weather_cross":
+        return await _weather_cross(str(args.get("机场", "ZBAA")))
+
+    if name == "guide_rescue":
+        return await _guide_rescue()
+
     if name == "start_imaging":
         from astro_agent.planner import TARGETS as _TG
         from astro_agent.param_calc import find_target
@@ -312,3 +343,103 @@ async def execute_tool(name: str, args: dict = None) -> dict:
 
 def llm_tools():
     return to_llm_schema()
+
+async def _weather_cross(station: str = "ZBAA"):
+    """天气多源交叉: METAR机场实况(观测) vs OpenMeteo/NINA(预报)"""
+    import re as _re
+    out = {"机场": station}
+    try:
+        r = await client.get(f"https://tgftp.nws.noaa.gov/data/observations/metar/stations/{station}.TXT", timeout=10)
+        txt = r.text
+        tl = txt.strip().split(chr(10))
+        metar = tl[-1] if tl else ""
+        out["原始METAR"] = metar
+        out["观测时间"] = tl[0] if tl else ""
+        m = _re.search(r"(\d{4,8})MPS|(\d{3})(\d{2,3})KT", metar)
+        if m:
+            out["风"] = m.group(1) + "m/s" if m.group(1) else m.group(2) + "°" + m.group(3) + "kt"
+        vis = _re.search(r"\s(\d{4})\s", metar)
+        if vis:
+            v = int(vis.group(1))
+            out["能见度"] = str(v) + "m " + ("⚠️差" if v < 10000 else "✅")
+        wx = _re.findall(r"\b(TSRA|SHRA|RA|SN|DZ|FG|BR|HZ)\b", metar)
+        if wx:
+            out["天气现象"] = {"TSRA": "雷暴阵雨⚠️", "SHRA": "阵雨", "RA": "雨", "SN": "雪",
+                              "DZ": "毛毛雨", "FG": "雾", "BR": "薄雾", "HZ": "霾"}.get(wx[0], wx[0])
+        clouds = _re.findall(r"(FEW|SCT|BKN|OVC)(\d{3})", metar)
+        if clouds:
+            cover = max((c for c, _ in clouds), key=lambda x: {"FEW": 1, "SCT": 2, "BKN": 3, "OVC": 4}.get(x, 0))
+            out["云况"] = cover + "(" + str(len(clouds)) + "层) " + ("阴天信号" if cover in ("BKN", "OVC") else ("可拍信号" if cover == "FEW" else "过渡"))
+        t = _re.search(r"\s(\d{2})/(\d{2})\s", metar)
+        if t:
+            out["温度"] = t.group(1) + "°C 露点" + t.group(2) + "°C"
+            if int(t.group(1)) - int(t.group(2)) <= 2:
+                out["结露风险"] = "温差≤2°C ⚠️高,注意镜头除露"
+    except Exception as e:
+        out["METAR失败"] = str(e)[:60]
+    try:
+        r2 = await client.get(f"{BASE or 'http://127.0.0.1:1888/v2/api'}/weather-data", timeout=8)
+        d2 = r2.json().get("Response", {})
+        if isinstance(d2, dict):
+            out["NINA侧"] = {"云量": d2.get("CloudCover"), "湿度": d2.get("Humidity")}
+    except Exception:
+        out["NINA侧"] = "不可用"
+    concl = []
+    ph = str(out.get("天气现象", ""))
+    if "⚠️" in ph:
+        concl.append("METAR实测" + ph + " — 若NINA云量不高则预报滞后,以实测为准")
+    cc = out.get("NINA侧", {}).get("云量") if isinstance(out.get("NINA侧"), dict) else None
+    cover = str(out.get("云况", ""))
+    if cc is not None and cover:
+        if cc > 85 and "阴天" in cover:
+            concl.append("两源一致阴天 ✅可信")
+        elif cc > 85 and "可拍" in cover:
+            concl.append("⚠️分歧: 预报阴但实测云少 — 可能好窗口,出摊前再确认")
+        elif cc < 40 and "阴天" in cover:
+            concl.append("⚠️分歧: 预报好但实测阴 — 小心白跑")
+    if out.get("结露风险"):
+        concl.append(out["结露风险"])
+    out["交叉结论"] = concl or ["无明显冲突"]
+    return out
+
+
+async def _guide_rescue():
+    """导星失锁自动抢救: 暂停序列→重导→稳定→恢复序列"""
+    log.info("🚨 导星失锁抢救流程启动")
+    steps = []
+    r = await client.get(f"{BASE or 'http://127.0.0.1:1888/v2/api'}/equipment/guider/info", timeout=8)
+    g = r.json().get("Response", {}) if r.status_code == 200 else {}
+    state = str(g.get("State", ""))
+    steps.append("当前导星状态: " + state)
+    if "lost" not in state.lower():
+        return {"结论": "导星未失锁,无需抢救", "状态": state}
+    try:
+        r2 = await client.get(f"{BASE or 'http://127.0.0.1:1888/v2/api'}/sequence/pause", timeout=8)
+        steps.append("序列已暂停" if r2.status_code == 200 else "序列暂停返回: " + str(r2.status_code))
+    except Exception as e:
+        steps.append("序列暂停失败: " + str(e)[:50])
+    try:
+        await client.get(f"{BASE or 'http://127.0.0.1:1888/v2/api'}/equipment/guider/stop-guiding", timeout=8)
+        steps.append("旧导星已停止")
+    except Exception:
+        pass
+    import asyncio as _a
+    await _a.sleep(5)
+    try:
+        r4 = await client.get(f"{BASE or 'http://127.0.0.1:1888/v2/api'}/equipment/guider/guide", timeout=8)
+        steps.append("重新导星指令已发 " + ("✓" if r4.status_code == 200 else "✗"))
+    except Exception as e:
+        return {"结论": "重导失败,请人工介入", "步骤": steps, "错误": str(e)[:80]}
+    for i in range(9):
+        await _a.sleep(10)
+        try:
+            r5 = await client.get(f"{BASE or 'http://127.0.0.1:1888/v2/api'}/equipment/guider/info", timeout=8)
+            s5 = str(r5.json().get("Response", {}).get("State", ""))
+            steps.append(str((i + 1) * 10) + "s 导星: " + s5)
+            if "lost" not in s5.lower() and ("loop" in s5.lower() or "guid" in s5.lower() or i >= 3):
+                await client.get(f"{BASE or 'http://127.0.0.1:1888/v2/api'}/sequence/resume", timeout=8)
+                steps.append("序列已恢复 ✓")
+                return {"结论": "抢救成功,导星恢复+序列续拍", "步骤": steps}
+        except Exception:
+            continue
+    return {"结论": "90秒未稳定,序列保持暂停,建议人工检查", "步骤": steps}

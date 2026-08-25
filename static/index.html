@@ -353,7 +353,15 @@
           <option value="local">local 纯本地</option>
         </select>
       </div>
-      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--stroke)">
+      <div style="margin-top:14px;padding:12px 14px;border-radius:12px;background:rgba(62,207,142,.06);border:1px dashed rgba(62,207,142,.3)">
+      <div style="font-size:13px;font-weight:600;color:#5eead4;margin-bottom:6px">🔭 望远镜速配(焦段→适合拍什么)</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="wizFocal" placeholder="焦距mm,如750" style="width:110px;padding:8px 10px;border:1px solid var(--stroke);border-radius:9px;background:rgba(15,25,45,.6);color:var(--text);font-size:12.5px">
+        <button onclick="wizMatch()" style="padding:8px 14px;border:none;border-radius:9px;background:var(--accent);color:#fff;cursor:pointer;font-size:12.5px">算</button>
+        <span id="wizOut" style="font-size:12px;color:#9db4d8"></span>
+      </div>
+    </div>
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--stroke)">
           <div style="font-size:14px;font-weight:600;margin-bottom:6px">📍 观测位置 <span style="font-size:11px;color:var(--t3);font-weight:400">(地图选点,推荐计算用)</span></div>
           <div style="display:flex;gap:8px;margin-bottom:8px">
             <input id="obsSearch" placeholder="搜地名,如 崇明岛/门头沟/武功山" style="flex:1;padding:9px 12px;border:1px solid var(--stroke);border-radius:10px;background:rgba(15,25,45,.6);color:var(--text);font-size:13px">
@@ -501,6 +509,21 @@ function addMsg(role,text,html){
   return div;
 }
 
+
+
+async function wizMatch(){
+  const f=parseFloat(document.getElementById('wizFocal').value);
+  const out=document.getElementById('wizOut');
+  if(!f||f<50){out.textContent='输入有效焦距';return}
+  out.textContent='计算中…';
+  try{
+    const r=await(await fetch('/api/tool_run',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:'camera_match',args:{焦距:f}})})).json();
+    const d=r.结果||r.result||r;
+    if(d&&d.最佳匹配){out.innerHTML='<b style="color:#5eead4">'+d.最佳匹配+'</b> · '+String(d.提示||'').slice(0,40)}
+    else{out.textContent='计算失败'}
+  }catch(e){out.textContent='失败:'+e.message}
+}
 
 // ═══ 新手向导 ═══
 function closeGuide(){const g=document.getElementById('newbieGuide');if(g)g.style.display='none';_LS.set('sp_guide_done','1');}

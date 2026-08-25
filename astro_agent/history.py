@@ -124,3 +124,34 @@ if __name__ == "__main__":
     upsert_session("2026-08-22", "NGC7380巫师星云", 张数=60, 总曝光秒=18000)  # 更新不重复
     r = query("按目标汇总", "巫师")
     print(json.dumps(r, ensure_ascii=False, indent=1))
+
+def export_history(path=None):
+    """导出全部历史为JSON(跨机合并用)"""
+    import json as _j
+    path = path or str(ROOT_DIR / "data" / "history_export.json") if False else (str((Path(__file__).parent.parent / "data" / "history_export.json")))
+    conn = _conn()
+    rows = conn.execute("SELECT * FROM sessions").fetchall()
+    cols = [d[1] for d in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+    data = [dict(zip(cols, r)) for r in rows]
+    with open(path, "w", encoding="utf-8") as f:
+        _j.dump(data, f, ensure_ascii=False, indent=1)
+    return {"导出": path, "条数": len(data)}
+
+def import_history(path):
+    """导入JSON历史(与现有库合并, 按 日期+目标 去重)"""
+    import json as _j
+    with open(path, encoding="utf-8") as f:
+        data = _j.load(f)
+    conn = _conn()
+    cols = [d[1] for d in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+    added = 0
+    for row in data:
+        have = conn.execute("SELECT id FROM sessions WHERE 日期=? AND 目标=?", (row.get("日期"), row.get("目标"))).fetchone()
+        if have:
+            continue
+        vals = [row.get(c) for c in cols if c != "id"]
+        q = f"INSERT INTO sessions ({','.join(c for c in cols if c != 'id')}) VALUES ({','.join('?' * len(vals))})"
+        conn.execute(q, vals)
+        added += 1
+    conn.commit()
+    return {"导入文件": path, "新增": added, "跳过重复": len(data) - added}

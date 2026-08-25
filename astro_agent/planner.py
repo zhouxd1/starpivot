@@ -200,3 +200,45 @@ if __name__ == "__main__":
         print(f"{i}. {t['名']} [{t['类型']}] {t['正季']} {t['易拍']}")
         print(f"   高度: 20点{t['高度角20点']}° / 23点{t['高度角23点']}° | {t['焦段']}mm | {t['滤镜']}")
         print(f"   {t['备注']} | 得分{t['得分']}")
+
+def multi_schedule(names: list, lat: float = 40.0, lon: float = 116.0):
+    """多目标智能排程: 按各自中天时刻排序,生成今晚拍摄时间表(贪心: 中天优先,避月不重算只提示)"""
+    import json as _j
+    data = _j.load(open(ROOT / "data" / "targets.json", encoding="utf-8"))["目标"]
+    by_name = {}
+    for t in data:
+        # 模糊匹配: 名字包含即可(M31仙女座星系 ← "仙女座"/"M31")
+        by_name[t["名"]] = t
+    picked = []
+    for want in names:
+        w = str(want).strip()
+        hit = by_name.get(w) or next((t for t in data if w in t["名"] or t["名"].startswith(w)), None)
+        if hit:
+            picked.append(hit)
+    sched = []
+    for t in picked:
+        try:
+            best_t, best_alt = meridian_passage(t["赤经"], t["赤纬"], lat, lon)
+            tm = best_t.strftime("%H:%M") if hasattr(best_t, "strftime") else str(best_t)
+            peak_h = best_alt if isinstance(best_alt, (int, float)) else 0
+        except Exception:
+            tm, peak_h = "-", 0
+        sched.append({"名": t["名"], "中天": tm, "峰值高度": peak_h,
+                      "焦段": t.get("焦段", ""), "滤镜": t.get("滤镜", ""), "易拍": "★" * t.get("易拍度", 3)})
+    # 按中天时刻排序(时间在前先拍)
+    def key(s):
+        tm = str(s["中天"])
+        try:
+            hh, mm = tm.split(":")[:2]
+            h = int(hh)
+            if h < 12: h += 24  # 夜间跨零点
+            return h * 60 + int(mm)
+        except Exception:
+            return 9999
+    sched.sort(key=key)
+    lines = ["📋 今晚拍摄计划(按中天时刻排序):"]
+    for i, s in enumerate(sched, 1):
+        lines.append(f"{i}. {s['中天']} 中天 | {s['名']} (峰值{s['峰值高度']:.0f}°·{s['滤镜']}·{s['焦段']}mm·{s['易拍']})")
+    if len(sched) >= 2:
+        lines.append("💡 共" + str(len(sched)) + "个目标,按此顺序接力;每个目标在自己中天前后±1.5h拍摄画质最佳")
+    return {"计划": lines, "明细": sched}

@@ -129,3 +129,27 @@ if __name__ == "__main__":
     r = calc("M31", 750, "IMX571(2600MM/585MC)")
     for k, v in r.items():
         print(f"  {k}: {v}")
+
+def match_camera(focal_mm: float, seeing_as: float = 2.0) -> dict:
+    """相机×焦段匹配推荐: 给定焦距,排出各相机的采样率/视场/适配结论"""
+    import math
+    rows = []
+    for name, (w, h, px) in SENSORS.items():
+        scale = 206.3 * px / focal_mm
+        fov_w = w / focal_mm * 57.3 * 60
+        fov_h = h / focal_mm * 57.3 * 60
+        ratio = scale / seeing_as
+        if ratio < 0.5:
+            verdict = "欠采样 — 建议bin2(等效采样翻倍,信噪比提升)"
+        elif ratio > 2.5:
+            verdict = "过采样 — 视场浪费,适合短焦目标或像元合并"
+        else:
+            verdict = "✅ 采样合适(经典区间1-2x视宁度)"
+        rows.append({"相机": name, "像元μm": px, "采样角秒": round(scale, 2),
+                     "视场": f"{fov_w:.1f}×{fov_h:.1f}'", "结论": verdict})
+    rows.sort(key=lambda r: abs(r["采样角秒"] / seeing_as - 1.2))
+    best = rows[0]
+    return {"焦距": focal_mm, "视宁度假设": f"~{seeing_as}\"",
+            "最佳匹配": str(best["相机"]) + " (采样 " + str(best["采样角秒"]) + '"/px)',
+            "全表": rows[:10],
+            "提示": "排序按与最佳采样的接近度; 实际以当地视宁度为准(郊区2-3\",山顶1-1.5\")"}

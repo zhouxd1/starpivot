@@ -186,6 +186,23 @@ add("safetymonitor_rescan", "重新扫描安全监控", "GET /equipment/safetymo
 
 # ═══════════ 天气 (3) ═══════════
 add("weather_status", "天气安全检查(云/雨/风/湿+智能判定)", "LOCAL /weather", {}, "无")
+add("weather_cross", "天气多源交叉验证: METAR机场实测(观测) vs NINA/OpenMeteo预报, 出摊前最后确认用,能发现预报滞后",
+    "LOCAL /workflow",
+    {"机场": ("string", "ICAO代码: ZBAA北京/ZSSS上海/ZUUU成都/ZLXY西安 等,默认ZBAA", False)}, "无")
+add("history_export", "历史库导出: 全部拍摄记录导出JSON(跨电脑合并用)", "LOCAL /workflow", {}, "无")
+add("history_import", "历史库导入: 导入另一台电脑的历史JSON,自动按日期+目标去重合并",
+    "LOCAL /workflow", {"路径": ("string", "JSON文件路径", True)}, "中")
+add("camera_match", "相机焦段匹配: 给定焦距推荐最合适的相机(采样率/视场/结论全表),买相机或换焦段前用",
+    "LOCAL /workflow",
+    {"焦距": ("number", "望远镜焦距mm", True), "视宁度": ("number", "当地视宁度角秒(默认2.0)", False)}, "无")
+add("obs_report", "观测报告生成: 一键汇总拍摄历史成战报(夜数/张数/曝光/HFR表格),HTML可直接转PDF分享",
+    "LOCAL /workflow",
+    {"目标": ("string", "目标名,留空=总报告", False)}, "无")
+add("multi_schedule", "多目标智能排程: 用户要一晚拍多个目标时用,按各目标中天时刻自动排序生成接力时间表",
+    "LOCAL /workflow",
+    {"目标": ("string", "目标名列表,逗号分隔,如: 巫师星云,心脏星云,象鼻", True)}, "无")
+add("guide_rescue", "导星失锁自动抢救: 检测失锁→暂停序列→重新导星→稳定后恢复序列. 导星Lost或用户说导星丢了时用",
+    "LOCAL /workflow", {}, "中")
 add("start_imaging", "一键开拍流程: GOTO目标→(等到达)→开始导星→启动序列. 用户说'开拍/开始拍X'时用",
     "LOCAL /workflow",
     {"target": ("string", "目标名(自动查星表坐标)", True),
