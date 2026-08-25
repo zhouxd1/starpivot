@@ -40,6 +40,18 @@ sys.path.insert(0, str(ROOT))
 from utils.config import CFG
 from astro_agent.ollama_client import ModelRouter
 from mcp_engine.executor_v2 import execute_tool as execute_en, llm_tools as tools_schema_for_llm, client as nina_client, BASE as NINA_BASE
+
+# NINA探活缓存: 连接失败后30s内短路(防无NINA机器每次轮询卡满超时)
+_nina_dead_until = 0.0
+
+def _nina_alive():
+    import time as _t
+    return _t.time() >= _nina_dead_until
+
+def _mark_nina_dead():
+    global _nina_dead_until
+    import time as _t
+    _nina_dead_until = _t.time() + 30
 import logging
 log = logging.getLogger("starpivot")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
@@ -142,9 +154,9 @@ async def chat(req: ChatReq):
     # 最多3轮工具调用
     for round_i in range(3):
         try:
-            reply = await asyncio.wait_for(get_router().chat(sess["messages"], tools=tools), timeout=90)
+            reply = await asyncio.wait_for(get_router().chat(sess["messages"], tools=tools), timeout=150)
         except asyncio.TimeoutError:
-            reply = {"choices": [{"message": {"content": "⏱ AI通道响应超时(90秒)。可能模型服务拥堵,请稍后重试;若频繁超时可在设置里换模型通道。"}}]}
+            reply = {"choices": [{"message": {"content": "⏱ AI通道响应超时(150秒)。可能模型服务拥堵,请稍后重试;若频繁超时可在设置里换模型通道。"}}]}
         if not reply.get("tool_calls"):
             final = reply.get("content", "")
             break
@@ -435,10 +447,14 @@ def _n(v):
 async def api_monitor(v: str = None):
     import httpx as _hx
     async def g(path):
+        if not _nina_alive():
+            return {}
         try:
-            r = await nina_client.get(f"{NINA_BASE}{path}", timeout=6)
+            r = await nina_client.get(f"{NINA_BASE}{path}", timeout=3)
             return r.json().get("Response", {}) if r.status_code == 200 else {}
         except Exception:
+            _mark_nina_dead()
+            return {}
             return {}
     seq, cam, mount, guider, wx, fw, foc, rot, sw = await asyncio.gather(
         g("/sequence/state"), g("/equipment/camera/info"),

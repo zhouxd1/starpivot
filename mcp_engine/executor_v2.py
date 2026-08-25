@@ -232,15 +232,20 @@ async def execute_tool(name: str, args: dict = None) -> dict:
         devs = ["camera", "mount", "focuser", "filterwheel", "guider",
                 "rotator", "dome", "flatdevice", "switch", "safetymonitor"]
         results, ok_cnt = {}, 0
-        for dev in devs:
+
+        async def _one(dev):
             try:
-                r = await client.get(f"{BASE}/equipment/{dev}/{action}", timeout=15)
+                r = await client.get(f"{BASE}/equipment/{dev}/{action}", timeout=25)
                 body = r.json() if r.status_code == 200 else {}
                 ok = r.status_code == 200 and body.get("Success") is True
-                results[dev] = "✓" if ok else f"✗{body.get('Error') or body.get('StatusCode') or r.status_code}"
-                ok_cnt += ok
-            except Exception as e:
-                results[dev] = "✗超时"
+                return dev, ("✓" if ok else "✗" + str(body.get('Error') or body.get('StatusCode') or r.status_code)), ok
+            except Exception:
+                return dev, "✗超时", False
+
+        import asyncio as _a2
+        for _dev, _mark, _ok in await _a2.gather(*[_one(d) for d in devs]):
+            results[_dev] = _mark
+            ok_cnt += _ok
         # 连接后实测各设备真实状态(防假成功)
         real_online = []
         if action == "connect":

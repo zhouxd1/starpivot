@@ -449,11 +449,13 @@ const _LS={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set
 
 async function send(text){
   if(!text||send.busy)return; send.busy=true;
+  const _t0=Date.now();
   addMsg("user",text);
   $("send").disabled=true;$("input").value="";
   const m=addMsg("ai","思考中…");
+  const busyHint=setInterval(()=>{const b=m.querySelector(".bub");if(b&&b.textContent==="思考中…"&&Date.now()-_t0>15000)b.textContent="仍在执行中… 批量连接/开拍等操作较慢属正常,最长可等150秒";},5000);
   const ctl=new AbortController();
-  const tmr=setTimeout(()=>ctl.abort(),60000);
+  const tmr=setTimeout(()=>ctl.abort(),150000);
   try{
     const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({message:text,session_id:sid}),signal:ctl.signal});
@@ -463,8 +465,8 @@ async function send(text){
     m.querySelector(".bub").textContent=d.reply;
     m.querySelector(".meta").textContent=`星枢 · ${d["耗时秒"]}s · ${d["通道"]}`;
   }catch(e){
-    clearTimeout(tmr);
-    m.querySelector(".bub").textContent=(e.name==="AbortError")?"⏱ 等了60秒还没回话,AI通道可能拥堵 — 请重发一次;仍超时请在⚙️设置里换个模型通道":"❌ 连接失败: "+e.message;
+    clearTimeout(tmr);clearInterval(busyHint);
+    m.querySelector(".bub").textContent=(e.name==="AbortError")?"⏱ 等了150秒还没回话 — 如果是「连接所有设备/开拍」这类批量操作属正常(设备逐台握手慢),请稍等片刻再发「查看设备总览」确认结果;若是普通对话超时,请在⚙️设置换个模型通道":"❌ 连接失败: "+e.message;
   }
   send.busy=false;$("send").disabled=false;$("input").focus();
 }
@@ -789,6 +791,7 @@ function renderOverlay(d){
 async function loadMonitor(){
   try{
     const d=await(await fetch("/api/monitor")).json();
+    window._lastMon=d;
     const s=d["序列"];
     const seq=document.getElementById("monSeq")||document.getElementById("topSeq");
     if(seq) seq.innerHTML = s.状态!=="空闲"
@@ -888,7 +891,15 @@ async function loadMonitor(){
   }catch(e){}
 }
 setInterval(()=>{const t=document.getElementById("topTime");if(t)t.textContent=new Date().toLocaleTimeString("zh-CN",{hour12:false})},1000);
-loadMonitor(); setInterval(loadMonitor, 8000);
+loadMonitor(); let _deadCnt=0;
+function _adaptivePoll(){
+  loadMonitor().then(d=>{
+    if(md && Object.values(md).every(v=>!v||typeof v!=='object'||v.在线===false||v.Connected===false||v.在线===undefined)) _deadCnt++;
+    else _deadCnt=0;
+    setTimeout(_adaptivePoll, _deadCnt>=3?30000:8000);
+  }).catch(()=>setTimeout(_adaptivePoll,30000));
+}
+_adaptivePoll();;
 addMsg("ai", "你好, 我是星枢 🌌<br><br>试试这些指令:<br>· <b>今晚拍什么</b> — 智能推荐目标+最佳时段<br>· <b>巫师星云怎么拍</b> — 完整拍摄参数<br>· <b>开始拍巫师星云</b> — 一键GOTO+导星+序列<br>· <b>CCD降到零下10度</b> — 制冷控制<br><br>右侧工具箱有136个工具, 下方快捷栏会记住你的常用 👇", true);
 /* 首次运行引导: 无Key自动弹设置 */
 (async()=>{
