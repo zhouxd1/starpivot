@@ -984,16 +984,17 @@ let obsMarker=null, obsLeaflet=null;
 function initObsMap(){
   if(obsLeaflet||!document.getElementById('obsMap'))return;
   const link=document.createElement('link');
-  link.rel='stylesheet';link.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
+  link.rel='stylesheet';link.href='/vendor/leaflet.css';
   document.head.appendChild(link);
   const s=document.createElement('script');
-  s.src='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
+  s.src='/vendor/leaflet.js';
   s.onload=()=>{
     const saved=_LS.get('sp_obs')||'40.0,116.4';
     const [la,ln]=saved.split(',').map(Number);
     obsLeaflet=L.map('obsMap',{zoomControl:true,attributionControl:false}).setView([la,ln],7);
-    L.tileLayer('https://webrd0{1,2,3}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',{maxZoom:18,subdomains:['1','2','3']}).addTo(obsLeaflet);
-    obsMarker=L.marker([la,ln]).addTo(obsLeaflet);
+    L.tileLayer('/api/tile/{z}/{x}/{y}',{maxZoom:18,subdomains:['1','2','3']}).addTo(obsLeaflet);
+    const mkIcon=L.icon({iconUrl:'/vendor/images/marker-icon.png',iconRetinaUrl:'/vendor/images/marker-icon-2x.png',shadowUrl:'/vendor/images/marker-shadow.png',iconSize:[25,41],iconAnchor:[12,41]});
+    obsMarker=L.marker([la,ln],{icon:mkIcon}).addTo(obsLeaflet);
     obsLeaflet.on('click',e=>{
       obsMarker.setLatLng(e.latlng);
       _LS.set('sp_obs',e.latlng.lat.toFixed(4)+','+e.latlng.lng.toFixed(4));

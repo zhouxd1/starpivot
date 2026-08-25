@@ -45,6 +45,7 @@ log = logging.getLogger("starpivot")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
 
 app = FastAPI(title="星枢天文AI助手")
+app.mount("/vendor", StaticFiles(directory=str(RES / "static" / "vendor")), name="vendor")
 router_llm = ModelRouter()
 
 def get_router():
@@ -667,6 +668,25 @@ async def api_geocode(q: str):
         return {"ok": True, "lon": c[0], "lat": c[1], "name": f.get("properties", {}).get("name", "")}
     except Exception as e:
         return {"ok": False, "msg": str(e)[:80]}
+
+
+
+
+# ---------- 地图瓦片后端代理(高德对直连UA敏感,统一走后端) ----------
+@app.get("/api/tile/{z}/{x}/{y}")
+async def api_tile(z: int, x: int, y: int):
+    import httpx as _hx
+    from fastapi.responses import Response as _Resp
+    sub = ["01", "02", "03", "04"][abs(x + y) % 4]
+    url = f"https://webrd{sub}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}"
+    try:
+        r = await _hx.AsyncClient().get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200 and r.content:
+            return _Resp(r.content, media_type="image/png",
+                         headers={"Cache-Control": "public, max-age=86400"})
+    except Exception:
+        pass
+    return _Resp(b"", media_type="image/png")
 
 
 if __name__ == "__main__":
