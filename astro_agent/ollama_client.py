@@ -58,7 +58,7 @@ class ModelRouter:
                            "temperature": temperature, "max_tokens": max_tokens}
                 if tools:
                     payload["tools"] = tools
-                async with httpx.AsyncClient(timeout=90) as c:
+                async with httpx.AsyncClient(timeout=40) as c:
                     r = await c.post(ch["base"] + "/chat/completions",
                                      headers={"Authorization": f'Bearer {ch["key"]}'},
                                      json=payload)

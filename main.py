@@ -104,9 +104,10 @@ _load_sessions()   # sid → {messages: [...], created, last}
 
 class ChatReq(BaseModel):
     message: str
-    session_id: str = ""
+    session_id: str | None = ""
 
-def get_session(sid: str):
+def get_session(sid):
+    sid = sid or ""
     if sid not in SESSIONS:
         sid = sid or f"astro-{uuid.uuid4().hex[:8]}"
         SESSIONS[sid] = {"messages": [{"role": "system", "content": SYSTEM_PROMPT}],
@@ -153,10 +154,17 @@ async def chat(req: ChatReq):
     t0 = time.time()
     # 最多3轮工具调用
     for round_i in range(3):
-        try:
-            reply = await asyncio.wait_for(get_router().chat(sess["messages"], tools=tools), timeout=150)
-        except asyncio.TimeoutError:
-            reply = {"choices": [{"message": {"content": "⏱ AI通道响应超时(150秒)。可能模型服务拥堵,请稍后重试;若频繁超时可在设置里换模型通道。"}}]}
+        reply = None
+        for attempt in range(2):  # 偶发断连/超时自动重试1次
+            try:
+                reply = await asyncio.wait_for(get_router().chat(sess["messages"], tools=tools), timeout=70)
+                break
+            except asyncio.TimeoutError:
+                if attempt == 0: log.warning('LLM 70s超时,重试'); continue
+                reply = {"choices": [{"message": {"content": "⏱ AI通道两次响应超时。可能模型服务拥堵 — 通常稍等或重发即可(重启星枢也可恢复)。"}}]}
+            except Exception as e:
+                if attempt == 0: log.warning(f'LLM异常重试: {str(e)[:60]}'); continue
+                reply = {"choices": [{"message": {"content": f"⚠️ AI通道异常: {str(e)[:60]} — 重发一次,若持续请在设置换模型通道。"}}]}
         if not reply.get("tool_calls"):
             final = reply.get("content", "")
             break
