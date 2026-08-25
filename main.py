@@ -370,8 +370,26 @@ def push_feishu_alert(text):
         log.warning(f"飞书告警失败: {traceback.format_exc()[-200:]}")
 
 
+def _observing_active(d) -> bool:
+    """是否处于观测状态: 任一设备在线且(序列在跑/跟踪中/制冷中)。
+    设备全关时一律不告警 — 白天没出门不打扰。"""
+    try:
+        eq = [d.get(k, {}) for k in ("相机", "赤道仪", "导星")]
+        any_online = any(
+            x.get("在线") is True or (x.get("制冷") == "开") or (x.get("跟踪") not in (None, "关"))
+            for x in eq if isinstance(x, dict))
+        seq_running = str(d.get("序列", {}).get("状态", "")) not in ("", "空闲", "IDLE", "None", "idle")
+        cam_cooling = d.get("相机", {}).get("制冷") == "开"
+        mount_tracking = d.get("赤道仪", {}).get("跟踪") not in (None, "关")
+        return (seq_running or cam_cooling or mount_tracking) and any_online
+    except Exception:
+        return False
+
+
 def check_alerts(d):
-    """监控数据驱动的告警判定(在api_monitor后调用)"""
+    """监控数据驱动的告警判定(在api_monitor后调用) — 仅观测状态才发"""
+    if not _observing_active(d):
+        return
     # 危险天气(只报一次, 恢复后重置)
     wx = d.get("天气", {})
     cloud = wx.get("云量")
@@ -601,9 +619,40 @@ async def console():
     return FileResponse(RES / "static" / "index.html")
 
 
+# ---------- 观测位置(地图选点) ----------
+@app.post("/api/set_obs")
+async def api_set_obs(req: dict):
+    """前端地图选点 → 写入.env OBS_LAT/OBS_LON, 下次位置检测即生效"""
+    import re as _re
+    latlng = str(req.get("latlng", ""))
+    m = _re.match(r'^(-?\d+\.?\d*),(-?\d+\.?\d*)$', latlng)
+    if not m:
+        return {"ok": False, "msg": "坐标格式错误"}
+    lat, lon = m.group(1), m.group(2)
+    env_p = ROOT / ".env"
+    env = env_p.read_text(encoding="utf-8") if env_p.exists() else ""
+    def upsert(text, key, val):
+        if _re.search(rf'^{key}=.*$', text, _re.M):
+            return _re.sub(rf'^{key}=.*$', f'{key}={val}', text, flags=_re.M)
+        return text + f'{key}={val}' + chr(10)
+    env = upsert(env, "OBS_LAT", lat)
+    env = upsert(env, "OBS_LON", lon)
+    env_p.write_text(env, encoding="utf-8")
+    # 通知executor重载CFG(位置检测读.env)
+    try:
+        import mcp_engine.executor_v2 as ex
+        if hasattr(ex, "CFG"):
+            ex.CFG["OBS_LAT"] = lat
+            ex.CFG["OBS_LON"] = lon
+    except Exception:
+        pass
+    return {"ok": True, "lat": lat, "lon": lon, "msg": "观测位置已更新, 推荐将按新位置计算"}
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(CFG.get("STARPIVOT_PORT", "8899"))
     print(f"🌌 星枢天文AI助手 → http://127.0.0.1:{port}")
     print(f"   模型: {CFG.get('MODEL_ROUTE')} | NINA: 真机(v2/api)"  )
     uvicorn.run(app, host="127.0.0.1", port=port)
+

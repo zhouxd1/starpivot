@@ -353,6 +353,18 @@
           <option value="local">local 纯本地</option>
         </select>
       </div>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--stroke)">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px">📍 观测位置 <span style="font-size:11px;color:var(--t3);font-weight:400">(地图选点,推荐计算用)</span></div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input id="obsSearch" placeholder="搜地名,如 崇明岛/门头沟/武功山" style="flex:1;padding:9px 12px;border:1px solid var(--stroke);border-radius:10px;background:rgba(15,25,45,.6);color:var(--text);font-size:13px">
+            <button onclick="obsGeocode()" style="padding:9px 14px;border:none;border-radius:10px;background:var(--accent);color:#fff;cursor:pointer;font-size:13px">搜索</button>
+          </div>
+          <div id="obsMap" style="height:240px;border-radius:12px;border:1px solid var(--stroke);cursor:crosshair"></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+            <span id="obsLabel" style="font-size:12px;color:var(--t3)">点击地图选点</span>
+            <span style="margin-left:auto"></span>
+          </div>
+        </div>
       <button onclick="saveSettings()" style="width:100%;padding:11px;border:none;border-radius:10px;
         background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer">💾 保存设置</button>
       <div style="display:flex;gap:10px;margin-top:10px">
@@ -943,7 +955,55 @@ async function testModel(){
     document.getElementById("testModelRes").style.color=r.ok?"#0c8f6f":"#e05252";
   }catch(e){document.getElementById("testModelRes").textContent="❌ 请求失败"}
 }
+async 
+// ═══ 地图选点(Leaflet + OSM瓦片 + Nominatim搜索, 全免key) ═══
+let obsMarker=null, obsLeaflet=null;
+function initObsMap(){
+  if(obsLeaflet||!document.getElementById('obsMap'))return;
+  const link=document.createElement('link');
+  link.rel='stylesheet';link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  document.head.appendChild(link);
+  const s=document.createElement('script');
+  s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  s.onload=()=>{
+    const saved=_LS.get('sp_obs')||'40.0,116.4';
+    const [la,ln]=saved.split(',').map(Number);
+    obsLeaflet=L.map('obsMap',{zoomControl:true,attributionControl:false}).setView([la,ln],7);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17}).addTo(obsLeaflet);
+    obsMarker=L.marker([la,ln]).addTo(obsLeaflet);
+    obsLeaflet.on('click',e=>{
+      obsMarker.setLatLng(e.latlng);
+      _LS.set('sp_obs',e.latlng.lat.toFixed(4)+','+e.latlng.lng.toFixed(4));
+      document.getElementById('obsLabel').textContent='📍 '+e.latlng.lat.toFixed(4)+', '+e.latlng.lng.toFixed(4);
+    });
+    document.getElementById('obsLabel').textContent='📍 '+la+', '+ln;
+    setTimeout(()=>obsLeaflet.invalidateSize(),200);
+  };
+  document.head.appendChild(s);
+}
+async function obsGeocode(){
+  const q=document.getElementById('obsSearch').value.trim();
+  if(!q)return;
+  document.getElementById('obsLabel').textContent='搜索中…';
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q),{headers:{'Accept':'application/json'}});
+    const d=await r.json();
+    if(!d.length){document.getElementById('obsLabel').textContent='没找到,试试更具体的地名';return}
+    const la=parseFloat(d[0].lat),ln=parseFloat(d[0].lon);
+    obsLeaflet.setView([la,ln],11);
+    obsMarker.setLatLng([la,ln]);
+    _LS.set('sp_obs',la.toFixed(4)+','+ln.toFixed(4));
+    document.getElementById('obsLabel').textContent='📍 '+la.toFixed(4)+', '+ln.toFixed(4)+' ('+d[0].display_name.split(',')[0]+')';
+  }catch(e){document.getElementById('obsLabel').textContent='搜索失败(网络),可直接点地图'}
+}
+
+async function saveObsToServer(){
+  const v=_LS.get('sp_obs');
+  if(!v)return;
+  try{await fetch('/api/set_obs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({latlng:v})});}catch(e){}
+}
 async function saveSettings(){
+  saveObsToServer();
   const body={SITE_NAME:s_site.value||"我的观测点", OBS_LAT:s_lat.value||40.0,
               OBS_LON:s_lon.value||116.4, TELESCOPE_NAME:s_tname.value||"",
               TELESCOPE_FOCAL:s_focal.value||"",
