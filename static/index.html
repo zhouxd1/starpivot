@@ -615,7 +615,7 @@ let _toolsData=null,_curCat="全部";
 function toggleTools(show){
   const p=document.getElementById("toolsPanel");
   p.style.display=show?"flex":"none";
-  if(show&&!_toolsData)loadTools2();
+  if(show&&!_toolsData)loadTools2(); else if(show)loadTools2();
   if(show)document.getElementById("tpSearch").focus();
 }
 document.getElementById("toolsBtn").onclick=()=>toggleTools(true);
@@ -628,9 +628,10 @@ async function loadTools2(){
     _toolsData=d;
     document.getElementById("tpTotal").textContent=d.total+"个工具 · "+Object.keys(d.categories).length+"类";
     renderCats();renderTools("");
-  }catch(e){document.getElementById("tpList").innerHTML="<div style='color:var(--t3)'>加载失败</div>"}
+  }catch(e){_toolsData=null;document.getElementById("tpList").innerHTML="<div style='color:var(--t3);text-align:center;padding:40px;cursor:pointer' onclick='loadTools2()'>加载失败 — 点击重试</div>"}
 }
 function renderCats(){
+  if(!_toolsData||!_toolsData.categories)return;
   const cats=["全部",...Object.keys(_toolsData.categories)];
   document.getElementById("tpCats").innerHTML=cats.map(c=>{
     const n=c==="全部"?_toolsData.total:_toolsData.categories[c].length;
@@ -639,6 +640,7 @@ function renderCats(){
   document.querySelectorAll(".tpcat").forEach(b=>b.onclick=()=>{_curCat=b.dataset.c;renderCats();renderTools(document.getElementById("tpSearch").value)});
 }
 function renderTools(q){
+  if(!_toolsData||!_toolsData.categories){loadTools2();return}
   q=(q||"").toLowerCase();
   const box=document.getElementById("tpList");
   let items=[];
