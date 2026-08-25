@@ -174,6 +174,28 @@ async def execute_tool(name: str, args: dict = None) -> dict:
                                          "WindSpeed", "RainRate", "Pressure")})}
 
     # 批量连接/断开: ninaAPI无all端点("Invalid equipment"), 循环单设备实现
+    # 圆顶/平顶前置检查: 没配设备时说人话,不让AI瞎猜
+    if name.startswith("dome_") and name not in ("dome_info", "dome_list"):
+        r = await client.get(f"{BASE}/equipment/dome/info", timeout=8)
+        d = r.json().get("Response", {}) if r.status_code == 200 else {}
+        if not d.get("Connected") and str(d.get("ShutterStatus", "")).endswith("None") is False and not d.get("Connected"):
+            pass  # 已连,放行
+        if not d.get("Connected"):
+            # 查dome设备是否配置
+            r2 = await client.get(f"{BASE}/equipment/dome/list-devices", timeout=8)
+            devs = r2.json().get("Response", []) if r2.status_code == 200 else []
+            chosen = next((x for x in devs if x.get("Id") not in (None, "No_Device")), None)
+            if not chosen:
+                return {"状态": "无法执行",
+                        "原因": "NINA中未配置圆顶/平顶设备(当前=没有圆顶)",
+                        "怎么办": "1)若你有圆顶或平顶: 在NINA设备区选择对应驱动(如ASCOM Dome)并连接后重试; 2)若是手动开合的平顶: 本功能不适用,出摊前手动开合即可; 3)注意:平顶通常可作为ASCOM Dome驱动接入(带开关盖能力的),装ASCOM平台+厂商驱动后NINA里可选",
+                        "设备能力": {"CanSetShutter": d.get("CanSetShutter", False), "ShutterStatus": d.get("ShutterStatus")}}
+        elif name in ("dome_open_shutter", "dome_close_shutter") and not d.get("CanSetShutter"):
+            return {"状态": "无法执行",
+                    "原因": f"当前圆顶驱动不支持舱盖控制(CanSetShutter=false, ShutterStatus={d.get('ShutterStatus')})",
+                    "怎么办": "检查NINA里选择的圆顶驱动类型是否正确;平顶应选择支持开关盖的ASCOM Dome驱动",
+                    "设备能力": {"CanSetShutter": d.get("CanSetShutter"), "ShutterStatus": d.get("ShutterStatus")}}
+
     if name in ("equipment_connect_all", "equipment_disconnect_all"):
         action = "connect" if name.startswith("equipment_connect") else "disconnect"
         devs = ["camera", "mount", "focuser", "filterwheel", "guider",

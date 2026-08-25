@@ -21,6 +21,11 @@
 - **一键开拍** — GOTO→到达确认→导星→序列 全自动串联
 - **Electron 桌面壳** — 托盘常驻/全局热键/红光模式
 
+## 📦 下载
+
+- ** Releases 下载开箱即用的桌面版(星枢.exe)**: [github.com/zhouxd1/starpivot/releases](https://github.com/zhouxd1/starpivot/releases)
+- 源码运行见下方快速开始
+
 ## 🚀 快速开始
 
 ```bash
