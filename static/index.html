@@ -950,6 +950,7 @@ addMsg("ai", "你好, 我是星枢 🌌<br><br>试试这些指令:<br>· <b>今�
 document.getElementById("setBtn").onclick=async()=>{
   const p=document.getElementById("setPanel");
   p.style.display=p.style.display==="none"?"block":"none";
+  if(p.style.display==="block"){ setTimeout(()=>{ try{initObsMap()}catch(e){} }, 50); }
   if(p.style.display==="block"){
     const d=await(await fetch("/api/settings")).json();
     s_site.value=d.SITE_NAME||""; s_lat.value=d.OBS_LAT||""; s_lon.value=d.OBS_LON||"";
@@ -978,16 +979,15 @@ async function testModel(){
     document.getElementById("testModelRes").style.color=r.ok?"#0c8f6f":"#e05252";
   }catch(e){document.getElementById("testModelRes").textContent="❌ 请求失败"}
 }
-async 
 // ═══ 地图选点(Leaflet + OSM瓦片 + Nominatim搜索, 全免key) ═══
 let obsMarker=null, obsLeaflet=null;
 function initObsMap(){
   if(obsLeaflet||!document.getElementById('obsMap'))return;
   const link=document.createElement('link');
-  link.rel='stylesheet';link.href='/vendor/leaflet.css';
+  link.rel='stylesheet';link.href='/vendor/leaflet.css?t='+Date.now();
   document.head.appendChild(link);
   const s=document.createElement('script');
-  s.src='/vendor/leaflet.js';
+  s.src='/vendor/leaflet.js?t='+Date.now();
   s.onload=()=>{
     const saved=_LS.get('sp_obs')||'40.0,116.4';
     const [la,ln]=saved.split(',').map(Number);
