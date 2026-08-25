@@ -649,6 +649,26 @@ async def api_set_obs(req: dict):
     return {"ok": True, "lat": lat, "lon": lon, "msg": "观测位置已更新, 推荐将按新位置计算"}
 
 
+
+
+# ---------- 地名搜索(photon后端代理, 避免前端跨域/403) ----------
+@app.get("/api/geocode")
+async def api_geocode(q: str):
+    import httpx
+    try:
+        r = await httpx.AsyncClient().get(
+            "https://photon.komoot.io/api/",
+            params={"limit": 1, "lang": "default", "q": q},
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            timeout=8)
+        d = r.json()
+        f = (d.get("features") or [{}])[0]
+        c = f.get("geometry", {}).get("coordinates") or [0, 0]
+        return {"ok": True, "lon": c[0], "lat": c[1], "name": f.get("properties", {}).get("name", "")}
+    except Exception as e:
+        return {"ok": False, "msg": str(e)[:80]}
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(CFG.get("STARPIVOT_PORT", "8899"))
