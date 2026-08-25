@@ -99,13 +99,40 @@ def get_session(sid: str):
         SESSIONS[sid] = {"messages": [{"role": "system", "content": SYSTEM_PROMPT}],
                           "created": time.time(), "last": time.time()}
     SESSIONS[sid]["last"] = time.time()
+    # N3: 会话总数上限50,淘汰最旧
+    if len(SESSIONS) > 50:
+        oldest = min(SESSIONS, key=lambda k: SESSIONS[k].get("last", 0))
+        if oldest != sid:
+            SESSIONS.pop(oldest, None)
     return sid
+
+def _trim_session(sess):
+    """N1: 消息滑动窗口 — system恒留,超过36条时把旧的滚动摘要成一段"""
+    msgs = sess["messages"]
+    if len(msgs) <= 36:
+        return
+    sysmsg = msgs[0]
+    body = msgs[1:]
+    # 旧消息摘要(保留首尾语义: 更早的压成一行纪要)
+    old_part = body[:-24]
+    keep_part = body[-24:]
+    digest_lines = []
+    for m in old_part[-30:]:
+        c = str(m.get("content", ""))[:60].replace(chr(10), " ")
+        role = "用户" if m.get("role") == "user" else "AI"
+        digest_lines.append(f"[{role}]{c}")
+    digest = ("(更早对话摘要,供上下文参考) " + " | ".join(digest_lines[-12:]))[:1200]
+    sess["messages"] = [sysmsg, {"role": "system", "content": digest}] + keep_part
+    # N3: 持久化也只留最后40条
+    if len(sess["messages"]) > 40:
+        sess["messages"] = [sess["messages"][0]] + sess["messages"][-39:]
 
 # ---------- 中文AI对话(核心: LLM↔MCP多轮循环) ----------
 @app.post("/api/chat")
 async def chat(req: ChatReq):
     sid = get_session(req.session_id)
     sess = SESSIONS[sid]
+    _trim_session(sess)
     sess["messages"].append({"role": "user", "content": req.message})
 
     tools = tools_schema_for_llm()
@@ -113,7 +140,10 @@ async def chat(req: ChatReq):
     t0 = time.time()
     # 最多3轮工具调用
     for round_i in range(3):
-        reply = await get_router().chat(sess["messages"], tools=tools)
+        try:
+            reply = await asyncio.wait_for(get_router().chat(sess["messages"], tools=tools), timeout=90)
+        except asyncio.TimeoutError:
+            reply = {"choices": [{"message": {"content": "⏱ AI通道响应超时(90秒)。可能模型服务拥堵,请稍后重试;若频繁超时可在设置里换模型通道。"}}]}
         if not reply.get("tool_calls"):
             final = reply.get("content", "")
             break
