@@ -315,7 +315,13 @@ register_settings_api(app, ROOT)
 @app.get("/api/tonight")
 async def api_tonight(v: str = None):
     from astro_agent.planner import tonight
-    r = tonight()
+    from mcp_engine.executor_v2 import _detect_location
+    try:
+        lat, lon, src = await _detect_location()
+    except Exception:
+        lat, lon, src = 40.0, 116.0, "默认北京"
+    r = tonight(lat=lat, lon=lon)
+    r["位置"] = f"{lat:.2f}, {lon:.2f} ({src})"
     return r
 
 
