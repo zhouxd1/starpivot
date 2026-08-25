@@ -555,24 +555,53 @@ async def api_trends():
     """HFR曲线(当前序列) + 天气趋势(近N次采样)"""
     import httpx
     out = {"hfr": [], "weather": []}
-    # HFR: 从NINA拿序列统计历史(尽力) — 拿不到就空
+    # HFR: image-history每帧统计(真实拍摄数据) + 序列state兜底
     try:
-        r = await nina_client.get(f"{NINA_BASE}/sequence/state", timeout=6)
-        seq = r.json().get("Response", {})
-        if isinstance(seq, dict):
-            for k in ("HFRHistory", "HfrHistory", "Statistics"):
-                v = seq.get(k)
-                if isinstance(v, list) and v:
-                    out["hfr"] = [x.get("HFR") if isinstance(x, dict) else x for x in v[-60:]]
-                    break
+        r = await nina_client.get(f"{NINA_BASE}/image-history", timeout=6)
+        imgs = r.json().get("Response", [])
+        if isinstance(imgs, list):
+            hlist = []
+            for im in imgs[-60:]:
+                h = im.get("HFR") or im.get("Hfr") or im.get("StarHFR")
+                if h is None and isinstance(im.get("Statistics"), dict):
+                    h = im["Statistics"].get("HFR") or im["Statistics"].get("Hfr")
+                if isinstance(h, (int, float)):
+                    hlist.append(round(h, 2))
+            out["hfr"] = hlist
     except Exception:
         pass
-    # 天气: 内存环形缓冲(WS线程在攒)
+    if not out["hfr"]:
+        try:
+            r2 = await nina_client.get(f"{NINA_BASE}/sequence/state", timeout=6)
+            seq = r2.json().get("Response", {})
+            if isinstance(seq, dict):
+                for k in ("HFRHistory", "HfrHistory", "Statistics"):
+                    v = seq.get(k)
+                    if isinstance(v, list) and v:
+                        out["hfr"] = [x.get("HFR") if isinstance(x, dict) else x for x in v[-60:]]
+                        break
+        except Exception:
+            pass
+    # 天气: 懒采样(距上次>100s就采一次,攒60点) — 不依赖后台线程
+    try:
+        if (time.time() - WX_LAST[0]) > 100:
+            WX_LAST[0] = time.time()
+            rw = await nina_client.get(f"{NINA_BASE}/equipment/weather/info", timeout=6)
+            dw = rw.json().get("Response", {})
+            cw = dw.get("CloudCover")
+            if isinstance(cw, (int, float)) and cw == cw:
+                WX_SAMPLES.append({"t": f"{_dt.now():%H:%M}", "cloud": cw,
+                                   "hum": dw.get("Humidity") if isinstance(dw.get("Humidity"), (int, float)) else None,
+                                   "wind": dw.get("WindSpeed") if isinstance(dw.get("WindSpeed"), (int, float)) else None})
+                if len(WX_SAMPLES) > 60: WX_SAMPLES.pop(0)
+    except Exception as _e:
+        log.warning(f'懒采样异常: {str(_e)[:80]}')
     out["weather"] = WX_SAMPLES[-60:]
     return out
 
 
 WX_SAMPLES = []
+WX_LAST = [0.0]
 
 
 _wx_nan_streak = 0
@@ -605,7 +634,7 @@ async def _wx_sampler():
                     await _wx_reconnect()
                     _wx_nan_streak = 0
             if isinstance(cloud, (int, float)) and cloud == cloud:
-                WX_SAMPLES.append({"t": f"{datetime.now():%H:%M}", "cloud": cloud,
+                WX_SAMPLES.append({"t": f"{_dt.now():%H:%M}", "cloud": cloud,
                                    "hum": hum if isinstance(hum, (int, float)) else None,
                                    "wind": d.get("WindSpeed") if isinstance(d.get("WindSpeed"), (int, float)) else None})
                 if len(WX_SAMPLES) > 60:
@@ -617,7 +646,10 @@ async def _wx_sampler():
 
 import asyncio as _aio2
 from datetime import datetime as _dt
-_aio2.get_event_loop().create_task(_wx_sampler())
+
+@app.on_event("startup")
+async def _start_sampler():
+    asyncio.get_event_loop().create_task(_wx_sampler())
 
 
 # ---------- 观测报告 ----------
