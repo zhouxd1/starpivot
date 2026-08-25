@@ -83,6 +83,15 @@ async def execute_tool(name: str, args: dict = None) -> dict:
 
     # 一键开拍工作流
     # ═══ 本地工具路由(星枢自研工作流) ═══
+    if name == "sequence_setup":
+        from astro_agent.seq_builder import setup_sequence
+        return setup_sequence(
+            args.get("目标", ""),
+            int(args.get("单张曝光秒", 300)),
+            int(args.get("张数", 20)),
+            args.get("滤镜"),
+            int(args["增益"]) if args.get("增益") else None)
+
     if name == "multi_schedule":
         from astro_agent.planner import multi_schedule as _ms
         lat, lon, _loc = await _detect_location()

@@ -198,6 +198,13 @@ add("camera_match", "相机焦段匹配: 给定焦距推荐最合适的相机(�
 add("obs_report", "观测报告生成: 一键汇总拍摄历史成战报(夜数/张数/曝光/HFR表格),HTML可直接转PDF分享",
     "LOCAL /workflow",
     {"目标": ("string", "目标名,留空=总报告", False)}, "无")
+add("sequence_setup", "配置拍摄序列(注入NINA): 把目标+曝光参数直接写进NINA序列 — '拍狮子星云300秒20张'/'把XX加入序列'时用",
+    "LOCAL /workflow",
+    {"目标": ("string", "目标名(自动查星表坐标)", True),
+     "单张曝光秒": ("number", "单张曝光时长,默认300", False),
+     "张数": ("number", "总张数,默认20", False),
+     "滤镜": ("string", "滤镜名如Ha/L/OIII,默认按星表推荐", False),
+     "增益": ("number", "相机增益,默认100(Ha)/120(宽带)", False)}, "中")
 add("multi_schedule", "多目标智能排程: 用户要一晚拍多个目标时用,按各目标中天时刻自动排序生成接力时间表",
     "LOCAL /workflow",
     {"目标": ("string", "目标名列表,逗号分隔,如: 巫师星云,心脏星云,象鼻", True)}, "无")
