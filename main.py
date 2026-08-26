@@ -141,6 +141,13 @@ def _trim_session(sess):
     if len(sess["messages"]) > 40:
         sess["messages"] = [sess["messages"][0]] + sess["messages"][-39:]
 
+# ---------- 高危操作二次确认 ----------
+HIGH_RISK_TOOLS = {"mount_park", "mount_unpark", "mount_flip", "sequence_start",
+                   "sequence_stop", "sequence_disconnect", "equipment_disconnect_all",
+                   "dome_open_shutter", "dome_close_shutter", "start_imaging"}
+_pending_confirm = {}   # session_id -> {tool, args, t}
+
+
 # ---------- 中文AI对话(核心: LLM↔MCP多轮循环) ----------
 @app.post("/api/chat")
 async def chat(req: ChatReq):
@@ -171,7 +178,22 @@ async def chat(req: ChatReq):
         # 执行工具(可能多个)
         tool_results = []
         for tc in reply["tool_calls"]:
-            r = await execute_en(tc["name"], tc["args"])
+            tname, targs = tc["name"], tc["args"]
+            # 高危二次确认: 首次拦下,等用户确认
+            if tname in HIGH_RISK_TOOLS:
+                pend = _pending_confirm.get(sid) or {}
+                user_said_yes = any(k in req.message for k in ("确认", "确定", "执行吧", "是的", "继续执行", "同意"))
+                fresh = pend.get("tool") == tname and (time.time() - pend.get("t", 0)) < 120
+                if not (fresh and user_said_yes):
+                    _pending_confirm[sid] = {"tool": tname, "args": targs, "t": time.time()}
+                    r = {"状态": "等待用户确认",
+                         "操作": tname,
+                         "说明": f"这是高危操作({tname}), 已拦截。请向用户复述将要执行的动作, 用户回复'确认/执行'后才真正执行; 120秒内有效",
+                         "用户已表态": bool(user_said_yes)}
+                    tool_results.append(f"[{tname}] " + json.dumps(r, ensure_ascii=False))
+                    continue
+                _pending_confirm.pop(sid, None)  # 放行并清除
+            r = await execute_en(tname, targs)
             rtxt = json.dumps(r, ensure_ascii=False)
             if len(rtxt) > 1200:
                 rtxt = rtxt[:1200] + " ...(已精简)"
